@@ -25,8 +25,15 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, gd, bcmath, intl, posix, fileinfo
           coverage: none
 
-      - name: Create SQLite Database
-        run: touch database/database.sqlite
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          sed -i 's|^#DB_DATABASE=panel|DB_DATABASE=${{ github.workspace }}/database/database.sqlite|' .env
+          sed -i 's|QUEUE_CONNECTION=redis|QUEUE_CONNECTION=sync|' .env
+          touch database/database.sqlite
+          mkdir -p storage/framework/{sessions,views,cache,testing}
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -43,18 +50,11 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
 
-      - name: Setup Environment
+      - name: Post-Install Setup
         run: |
-          cp .env.example .env
-          sed -i 's|^#DB_DATABASE=panel|DB_DATABASE=${{ github.workspace }}/database/database.sqlite|' .env
-          sed -i 's|QUEUE_CONNECTION=redis|QUEUE_CONNECTION=sync|' .env
+          composer run-script post-autoload-dump || true
           php artisan key:generate
-
-      - name: Run Post-Autoload Scripts
-        run: composer run-script post-autoload-dump || true
-
-      - name: Run Migrations
-        run: php artisan migrate --force
+          php artisan migrate --force
 
       - name: Check PHP Formatting (Pint)
         run: ./vendor/bin/pint --test -v
