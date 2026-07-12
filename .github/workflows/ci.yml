@@ -25,17 +25,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, gd, bcmath, intl, posix, fileinfo
           coverage: none
 
-      - name: Setup Environment
-        run: |
-          cp .env.example .env
-          sed -i 's/DB_CONNECTION=mysql/DB_CONNECTION=sqlite/' .env
-          sed -i 's/DB_DATABASE=reviactyl/DB_DATABASE=database\/database.sqlite/' .env
-          sed -i 's/DB_HOST=127.0.0.1/# DB_HOST=127.0.0.1/' .env
-          sed -i 's/DB_PORT=3306/# DB_PORT=3306/' .env
-          sed -i 's/DB_USERNAME=root/# DB_USERNAME=root/' .env
-          sed -i 's/DB_PASSWORD=/# DB_PASSWORD=/' .env
-          touch database/database.sqlite
-          php artisan key:generate
+      - name: Create SQLite Database
+        run: touch database/database.sqlite
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -52,9 +43,19 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
 
-      - name: Run Post-Autoload Scripts
+      - name: Setup Environment
         run: |
-          composer run-script post-autoload-dump || true
+          cp .env.example .env
+          sed -i 's/DB_CONNECTION=mysql/DB_CONNECTION=sqlite/' .env
+          sed -i 's/DB_DATABASE=reviactyl/DB_DATABASE=database\/database.sqlite/' .env
+          sed -i 's/DB_HOST=127.0.0.1/# DB_HOST=127.0.0.1/' .env
+          sed -i 's/DB_PORT=3306/# DB_PORT=3306/' .env
+          sed -i 's/DB_USERNAME=root/# DB_USERNAME=root/' .env
+          sed -i 's/DB_PASSWORD=/# DB_PASSWORD=/' .env
+          php artisan key:generate
+
+      - name: Run Post-Autoload Scripts
+        run: composer run-script post-autoload-dump || true
 
       - name: Run Migrations
         run: php artisan migrate --force
