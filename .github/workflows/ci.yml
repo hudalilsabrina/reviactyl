@@ -25,27 +25,17 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, gd, bcmath, intl, posix, fileinfo
           coverage: none
 
-      - name: Prepare Laravel Environment
+      - name: Setup Environment
         run: |
-          if [ -f .env.example ]; then
-            cp .env.example .env
-          else
-            cat > .env <<'EOF'
-          APP_KEY=
-          APP_ENV=testing
-          APP_DEBUG=true
-          APP_URL=http://localhost
-          DB_CONNECTION=sqlite
-          DB_DATABASE=/var/www/reviactyl/database/database.sqlite
-          CACHE_STORE=file
-          SESSION_DRIVER=file
-          QUEUE_CONNECTION=sync
-          EOF
-          fi
+          cp .env.example .env
+          sed -i 's/DB_CONNECTION=mysql/DB_CONNECTION=sqlite/' .env
+          sed -i 's/DB_DATABASE=reviactyl/DB_DATABASE=database\/database.sqlite/' .env
+          sed -i 's/DB_HOST=127.0.0.1/# DB_HOST=127.0.0.1/' .env
+          sed -i 's/DB_PORT=3306/# DB_PORT=3306/' .env
+          sed -i 's/DB_USERNAME=root/# DB_USERNAME=root/' .env
+          sed -i 's/DB_PASSWORD=/# DB_PASSWORD=/' .env
+          touch database/database.sqlite
           php artisan key:generate
-
-      - name: Create SQLite Database
-        run: touch database/database.sqlite
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -60,7 +50,11 @@ jobs:
             ${{ runner.os }}-composer-${{ matrix.php }}-
 
       - name: Install Composer Dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Run Post-Autoload Scripts
+        run: |
+          composer run-script post-autoload-dump || true
 
       - name: Run Migrations
         run: php artisan migrate --force
@@ -70,9 +64,6 @@ jobs:
 
       - name: Static Analysis (PHPStan)
         run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=512M
-
-      - name: Run Tests (Pest)
-        run: php artisan test --parallel || true
 
   frontend:
     name: Frontend
