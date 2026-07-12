@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'control' => 'التحكم',
+    'management' => 'إدارة',
+    'administration' => 'الإدارة',
+    'start' => 'تشغيل',
+    'stop' => 'توقيف',
+    'restart' => 'اعادة التشغيل',
+    'kill' => 'قتل',
+    'kill-warning' => 'يمكن أن يؤدي إيقاف الخادم بالقوة إلى تلف البيانات.',
+    'hide-stats' => 'إخفاء الإحصائيات',
+    'show-stats' => 'عرض الإحصائيات',
+    'force-stop-title' => 'إيقاف العملية بالقوة',
+    'force-stop-confirm' => 'يكمل',
+    'installer-running-title' => 'تشغيل المثبت',
+    'installer-running-message' => 'من المفترض أن يكون الخادم الخاص بك جاهزًا قريبًا، يرجى المحاولة مرة أخرى خلال بضع دقائق.',
+    'server-suspended-title' => 'الخادم معلق',
+    'server-suspended-message' => 'تم تعليق هذا الخادم ولا يمكن الوصول إليه.',
+    'node-maintenance-title' => 'العقدة تحت الصيانة',
+    'node-maintenance-message' => 'عقدة هذا الخادم قيد الصيانة حاليًا.',
+    'server-transferring-title' => 'نقل',
+    'server-transferring-message' => 'يتم الآن نقل الخادم الخاص بك إلى عقدة جديدة، يرجى التحقق مرة أخرى لاحقًا.',
+    'server-restoring-title' => 'الاستعادة من النسخة الاحتياطية',
+    'server-restoring-message' => 'تتم حاليًا استعادة الخادم الخاص بك من نسخة احتياطية، يرجى التحقق مرة أخرى خلال بضع دقائق.',
+];

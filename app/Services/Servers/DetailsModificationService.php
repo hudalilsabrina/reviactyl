@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Services\Servers;
+
+use App\Exceptions\Http\Connection\DaemonConnectionException;
+use App\Models\Server;
+use App\Repositories\Agent\DaemonRevocationRepository;
+use App\Traits\Services\ReturnsUpdatedModels;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Arr;
+
+class DetailsModificationService
+{
+    use ReturnsUpdatedModels;
+
+    /**
+     * DetailsModificationService constructor.
+     */
+    public function __construct(
+        private ConnectionInterface $connection,
+        private DaemonRevocationRepository $revocationRepository,
+    ) {}
+
+    /**
+     * Update the details for a single server instance.
+     *
+     * @throws \Throwable
+     */
+    public function handle(Server $server, array $data): Server
+    {
+        return $this->connection->transaction(function () use ($data, $server) {
+            $original = $server->user;
+
+            $server->forceFill([
+                'external_id' => Arr::get($data, 'external_id'),
+                'owner_id' => Arr::get($data, 'owner_id'),
+                'name' => Arr::get($data, 'name'),
+                'description' => Arr::get($data, 'description') ?? '',
+            ])->saveOrFail();
+
+            // If the owner_id value is changed we need to revoke any tokens that exist for the server
+            // on the Agent instance so that the old owner no longer has any permission to access the
+            // websockets.
+            if (! $server->refresh()->user->is($original)) {
+                try {
+                    $this->revocationRepository->setNode($server->node)->deauthorize(
+                        $original->uuid,
+                        [$server->uuid],
+                    );
+                } catch (DaemonConnectionException $exception) {
+                    // Do nothing. A failure here is not ideal, but it is likely to be caused by Agent
+                    // being offline, or in an entirely broken state. Remember, these tokens reset every
+                    // few minutes by default, we're just trying to help it along a little quicker.
+                }
+            }
+
+            return $server;
+        });
+    }
+}

@@ -1,0 +1,21 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/phpstan/phpstan-webmozart-assert/extension.neon
+    - vendor/nesbot/carbon/extension.neon
+
+rules:
+    - PHPStan\Rules\DeadCode\UnreachableStatementRule
+    - PHPStan\Rules\DeadCode\UnusedPrivateConstantRule
+    - PHPStan\Rules\DeadCode\UnusedPrivateMethodRule
+
+parameters:
+    level: 5
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - app
+    ignoreErrors:
+        - '#Call to an undefined method Prologue\\Alerts\\AlertsMessageBag::(success|warning|danger|info)\(\)#'
+    excludePaths:
+        - app/Livewire
+        - app/Repositories
+        - app/Extensions/Spatie/Fractalistic/Fractal.php

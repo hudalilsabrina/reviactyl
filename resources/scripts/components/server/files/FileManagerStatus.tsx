@@ -1,0 +1,114 @@
+import { useContext, useEffect } from 'react';
+import { ServerContext } from '@/state/server';
+import { XIcon } from '@heroicons/react/solid';
+import asDialog from '@/hoc/asDialog';
+import { Dialog, DialogWrapperContext } from '@/reviactyl/elements/dialog';
+import { Button } from '@/reviactyl/elements/button/index';
+import Tooltip from '@/reviactyl/elements/tooltip/Tooltip';
+import Code from '@/reviactyl/elements/Code';
+import { useSignal } from '@preact/signals-react';
+import { WithClassname } from '@/components/types';
+import { FaCloudArrowDown } from 'react-icons/fa6';
+import { useTranslation } from 'react-i18next';
+
+const svgProps = {
+    cx: 16,
+    cy: 16,
+    r: 14,
+    strokeWidth: 3,
+    fill: 'none',
+    stroke: 'currentColor',
+};
+
+const Spinner = ({ progress, className }: { progress: number; className?: string }) => (
+    <svg viewBox={'0 0 32 32'} className={className}>
+        <circle {...svgProps} className={'opacity-25'} />
+        <circle
+            {...svgProps}
+            stroke={'white'}
+            strokeDasharray={28 * Math.PI}
+            className={'rotate-[-90deg] origin-[50%_50%] transition-[stroke-dashoffset] duration-300'}
+            style={{ strokeDashoffset: ((100 - progress) / 100) * 28 * Math.PI }}
+        />
+    </svg>
+);
+
+const FileUploadList = () => {
+    const { t } = useTranslation('server/files');
+    const { close, setProps } = useContext(DialogWrapperContext);
+
+    useEffect(() => {
+        setProps({ title: t('uploads-title'), description: t('uploads-description') });
+    }, [setProps, t]);
+    const cancelFileUpload = ServerContext.useStoreActions((actions) => actions.files.cancelFileUpload);
+    const clearFileUploads = ServerContext.useStoreActions((actions) => actions.files.clearFileUploads);
+    const uploads = ServerContext.useStoreState((state) =>
+        Object.entries(state.files.uploads).sort(([a], [b]) => a.localeCompare(b))
+    );
+
+    return (
+        <div className={'space-y-2 mt-6'}>
+            {uploads.map(([name, file]) => (
+                <div key={name} className={'flex items-center space-x-3 bg-gray-900 p-3 rounded'}>
+                    <Tooltip content={`${Math.floor((file.loaded / file.total) * 100)}%`} placement={'left'}>
+                        <div className={'flex-shrink-0'}>
+                            <Spinner progress={(file.loaded / file.total) * 100} className={'w-6 h-6'} />
+                        </div>
+                    </Tooltip>
+                    <Code>{name}</Code>
+                    <button
+                        onClick={cancelFileUpload.bind(this, name)}
+                        className={'text-gray-600 hover:text-gray-200 transition-colors duration-75'}
+                    >
+                        <XIcon className={'w-5 h-5'} />
+                    </button>
+                </div>
+            ))}
+            <Dialog.Footer>
+                <Button.Danger variant={Button.Variants.Secondary} onClick={() => clearFileUploads()}>
+                    {t('cancel-uploads')}
+                </Button.Danger>
+                <Button.Text onClick={close}>{t('close')}</Button.Text>
+            </Dialog.Footer>
+        </div>
+    );
+};
+
+const FileUploadListDialog = asDialog({})(FileUploadList);
+
+export default ({ className }: WithClassname) => {
+    const { t } = useTranslation('server/files');
+    const open = useSignal(false);
+
+    const count = ServerContext.useStoreState((state) => Object.keys(state.files.uploads).length);
+    const progress = ServerContext.useStoreState((state) => ({
+        uploaded: Object.values(state.files.uploads).reduce((count, file) => count + file.loaded, 0),
+        total: Object.values(state.files.uploads).reduce((count, file) => count + file.total, 0),
+    }));
+
+    useEffect(() => {
+        if (count === 0) {
+            open.value = false;
+        }
+    }, [count]);
+
+    return (
+        <>
+            {count > 0 && (
+                <Tooltip content={t('uploads-tooltip', { count })}>
+                    <button
+                        className={
+                            className ||
+                            'flex items-center justify-center w-10 h-10 rounded-ui bg-gray-900 border border-gray-800 text-blue-300 hover:text-blue-100 hover:border-gray-600 transition-colors'
+                        }
+                        onClick={() => (open.value = true)}
+                    >
+                        <Spinner progress={(progress.uploaded / progress.total) * 100} className={'w-8 h-8'} />
+                        <FaCloudArrowDown className={'h-3 absolute mx-auto animate-pulse'} />
+                    </button>
+                </Tooltip>
+            )}
+            <FileUploadListDialog open={open.value} onClose={() => (open.value = false)} />
+        </>
+    );
+};

@@ -1,0 +1,96 @@
+import React from 'react';
+import { Actions, State, useStoreActions, useStoreState } from 'easy-peasy';
+import { Form, Formik, FormikHelpers } from 'formik';
+import Field from '@/reviactyl/elements/Field';
+import * as Yup from 'yup';
+import SpinnerOverlay from '@/reviactyl/elements/SpinnerOverlay';
+import updateAccountPassword from '@/api/account/updateAccountPassword';
+import { httpErrorToHuman } from '@/api/http';
+import { ApplicationStore } from '@/state';
+import tw from 'twin.macro';
+import { Button } from '@/reviactyl/elements/button/index';
+import { useTranslation } from 'react-i18next';
+
+interface Values {
+    current: string;
+    password: string;
+    confirmPassword: string;
+}
+
+export default () => {
+    const { t } = useTranslation('dashboard/account');
+    const user = useStoreState((state: State<ApplicationStore>) => state.user.data);
+    const { clearFlashes, addFlash } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);
+    const schema = Yup.object().shape({
+        current: Yup.string().min(1).required(t('password.current-required')),
+        password: Yup.string().min(8).required(),
+        confirmPassword: Yup.string().test('password', t('password.not-matching'), function (value) {
+            return value === this.parent.password;
+        }),
+    });
+
+    if (!user) {
+        return null;
+    }
+
+    const submit = (values: Values, { setSubmitting }: FormikHelpers<Values>) => {
+        clearFlashes('account:password');
+        updateAccountPassword({ ...values })
+            .then(() => {
+                window.location.href = '/auth/login';
+            })
+            .catch((error) =>
+                addFlash({
+                    key: 'account:password',
+                    type: 'error',
+                    title: t('password.error-title'),
+                    message: httpErrorToHuman(error),
+                })
+            )
+            .then(() => setSubmitting(false));
+    };
+
+    return (
+        <React.Fragment>
+            <Formik
+                onSubmit={submit}
+                validationSchema={schema}
+                initialValues={{ current: '', password: '', confirmPassword: '' }}
+            >
+                {({ isSubmitting, isValid }) => (
+                    <React.Fragment>
+                        <SpinnerOverlay size={'large'} visible={isSubmitting} />
+                        <Form css={tw`m-0`}>
+                            <Field
+                                id={'current_password'}
+                                type={'password'}
+                                name={'current'}
+                                label={t('password.current')}
+                            />
+                            <div css={tw`mt-6`}>
+                                <Field
+                                    id={'new_password'}
+                                    type={'password'}
+                                    name={'password'}
+                                    label={t('password.new')}
+                                    description={t('password.description')}
+                                />
+                            </div>
+                            <div css={tw`mt-6`}>
+                                <Field
+                                    id={'confirm_new_password'}
+                                    type={'password'}
+                                    name={'confirmPassword'}
+                                    label={t('password.confirm-new')}
+                                />
+                            </div>
+                            <div css={tw`mt-6`}>
+                                <Button disabled={isSubmitting || !isValid}>{t('password.update')}</Button>
+                            </div>
+                        </Form>
+                    </React.Fragment>
+                )}
+            </Formik>
+        </React.Fragment>
+    );
+};

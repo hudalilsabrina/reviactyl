@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Http\Requests\Api\Application\Nodes;
+
+use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Services\Acl\Api\AdminAcl;
+
+class GetNodesRequest extends ApplicationApiRequest
+{
+    protected ?string $resource = AdminAcl::RESOURCE_NODES;
+
+    protected int $permission = AdminAcl::READ;
+}

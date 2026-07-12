@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use App\Events\Auth\DirectLogin;
+use App\Exceptions\DisplayException;
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\StatefulGuard;
+use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
+
+abstract class AbstractLoginController extends Controller
+{
+    use AuthenticatesUsers;
+
+    protected StatefulGuard $auth;
+
+    /**
+     * Lockout time for failed login requests.
+     */
+    protected int $lockoutTime;
+
+    /**
+     * After how many attempts should logins be throttled and locked.
+     */
+    protected int $maxLoginAttempts;
+
+    /**
+     * Where to redirect users after login / registration.
+     */
+    protected string $redirectTo = '/';
+
+    /**
+     * LoginController constructor.
+     */
+    public function __construct()
+    {
+        $this->lockoutTime = config('auth.lockout.time');
+        $this->maxLoginAttempts = config('auth.lockout.attempts');
+    }
+
+    /**
+     * Get the failed login response instance.
+     *
+     * @return never-return
+     *
+     * @throws DisplayException
+     */
+    protected function sendFailedLoginResponse(Request $request, ?Authenticatable $user = null, ?string $message = null)
+    {
+        $this->incrementLoginAttempts($request);
+        $this->fireFailedLoginEvent($user, [
+            $this->getField($request->input('user')) => $request->input('user'),
+        ]);
+
+        if ($request->route()->named('auth.login-checkpoint')) {
+            throw new DisplayException($message ?? trans('auth.two_factor.checkpoint_failed'));
+        }
+
+        throw new DisplayException(trans('auth.failed'));
+    }
+
+    /**
+     * Send the response after the user was authenticated.
+     */
+    protected function sendLoginResponse(User $user, Request $request): JsonResponse
+    {
+        $request->session()->remove('auth_confirmation_token');
+        $request->session()->regenerate();
+
+        $this->clearLoginAttempts($request);
+
+        Auth::login($user, true);
+
+        Event::dispatch(new DirectLogin($user, true));
+
+        return new JsonResponse([
+            'data' => [
+                'complete' => true,
+                'intended' => $this->redirectPath(),
+                'user' => $user->toVueObject(),
+            ],
+        ]);
+    }
+
+    /**
+     * Determine if the user is logging in using an email or username.
+     */
+    protected function getField(?string $input = null): string
+    {
+        return ($input && Str::contains($input, '@')) ? 'email' : 'username';
+    }
+
+    /**
+     * Fire a failed login event.
+     */
+    protected function fireFailedLoginEvent(?Authenticatable $user = null, array $credentials = [])
+    {
+        Event::dispatch(new Failed('auth', $user, $credentials));
+    }
+}
