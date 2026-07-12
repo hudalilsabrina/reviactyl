@@ -25,6 +25,14 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, gd, bcmath, intl, posix, fileinfo
           coverage: none
 
+      - name: Prepare Laravel Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Create SQLite Database
+        run: touch database/database.sqlite
+
       - name: Get Composer Cache Directory
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
@@ -39,6 +47,9 @@ jobs:
 
       - name: Install Composer Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run Migrations
+        run: php artisan migrate --force
 
       - name: Check PHP Formatting (Pint)
         run: ./vendor/bin/pint --test -v
