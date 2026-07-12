@@ -85,6 +85,7 @@ class ServerTransformer extends BaseClientTransformer
             'egg_id' => $server->egg_id,
             'egg_image' => $server->egg->image,
             'containerText' => $server->node->containerText,
+            'subdomain' => $server->subdomains->first()?->fqdn,
         ];
     }
 

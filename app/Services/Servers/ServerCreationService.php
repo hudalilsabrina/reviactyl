@@ -18,6 +18,7 @@ use App\Repositories\Eloquent\ServerRepository;
 use App\Repositories\Eloquent\ServerVariableRepository;
 use App\Services\Deployment\AllocationSelectionService;
 use App\Services\Deployment\FindViableNodesService;
+use App\Services\Subdomains\SubdomainService;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -38,6 +39,7 @@ class ServerCreationService
         private ServerRepository $repository,
         private ServerDeletionService $serverDeletionService,
         private ServerVariableRepository $serverVariableRepository,
+        private SubdomainService $subdomainService,
         private VariableValidatorService $validatorService,
     ) {}
 
@@ -107,6 +109,9 @@ class ServerCreationService
 
             throw $exception;
         }
+
+        // Auto-create subdomain if subdomain feature is enabled
+        $this->subdomainService->createAutoSubdomain($server);
 
         return $server;
     }

@@ -473,6 +473,16 @@ class Server extends Model implements Identifiable
     }
 
     /**
+     * Gets all subdomains associated with this server.
+     *
+     * @return HasMany<ServerSubdomain, $this>
+     */
+    public function subdomains(): HasMany
+    {
+        return $this->hasMany(ServerSubdomain::class);
+    }
+
+    /**
      * Returns all of the activity log entries where the server is the subject.
      *
      * @return MorphToMany<ActivityLog, $this>

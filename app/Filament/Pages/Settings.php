@@ -25,6 +25,7 @@ use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Mail\MailManager;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class Settings extends Page implements HasSchemas
@@ -84,6 +85,11 @@ class Settings extends Page implements HasSchemas
         'panel:client_features:allocations:enabled',
         'panel:client_features:allocations:range_start',
         'panel:client_features:allocations:range_end',
+
+        'subdomains:enabled',
+        'subdomains:cloudflare_api_token',
+        'subdomains:cloudflare_zone_id',
+        'subdomains:base_domain',
     ];
 
     public function getHeading(): string
@@ -118,6 +124,13 @@ class Settings extends Page implements HasSchemas
             }
 
             if ($key === 'mail:mailers:smtp:password' && ! empty($value)) {
+                try {
+                    $value = $encrypter->decrypt($value);
+                } catch (\Throwable) {
+                }
+            }
+
+            if ($key === 'subdomains:cloudflare_api_token' && ! empty($value)) {
                 try {
                     $value = $encrypter->decrypt($value);
                 } catch (\Throwable) {
@@ -175,6 +188,11 @@ class Settings extends Page implements HasSchemas
                         ->label(trans('admin/settings.advanced.title'))
                         ->icon('tabler-adjustments')
                         ->schema($this->advancedSettings()),
+
+                    Tab::make('subdomains')
+                        ->label(trans('admin/settings.subdomains.title'))
+                        ->icon('tabler-link')
+                        ->schema($this->subdomainSettings()),
                 ]),
         ];
     }
@@ -564,6 +582,63 @@ class Settings extends Page implements HasSchemas
         ];
     }
 
+    private function subdomainSettings(): array
+    {
+        return [
+            Section::make(trans('admin/settings.subdomains.cloudflare'))
+                ->columns(4)
+                ->icon('tabler-brand-cloudflare')
+                ->schema([
+                    Toggle::make('subdomains:enabled')
+                        ->label(trans('admin/settings.subdomains.enabled'))
+                        ->inline(false)
+                        ->onIcon('tabler-check')
+                        ->offIcon('tabler-x')
+                        ->onColor('success')
+                        ->offColor('danger')
+                        ->live()
+                        ->columnSpan(4),
+
+                    TextInput::make('subdomains:base_domain')
+                        ->label(trans('admin/settings.subdomains.base_domain'))
+                        ->placeholder('srv.example.com')
+                        ->helperText(trans('admin/settings.subdomains.base_domain_helper'))
+                        ->required(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->columnSpan(2),
+
+                    TextInput::make('subdomains:cloudflare_zone_id')
+                        ->label(trans('admin/settings.subdomains.zone_id'))
+                        ->helperText(trans('admin/settings.subdomains.zone_id_helper'))
+                        ->required(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->columnSpan(2),
+
+                    TextInput::make('subdomains:cloudflare_api_token')
+                        ->label(trans('admin/settings.subdomains.api_token'))
+                        ->helperText(trans('admin/settings.subdomains.api_token_helper'))
+                        ->password()
+                        ->revealable()
+                        ->required(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->columnSpan(4),
+                ]),
+
+            Section::make(trans('admin/settings.subdomains.test_title'))
+                ->columns(4)
+                ->visible(fn ($get) => $get('subdomains:enabled'))
+                ->schema([
+                    Actions::make([
+                        Action::make('test_cloudflare')
+                            ->label(trans('admin/settings.subdomains.test_btn'))
+                            ->icon('tabler-brand-cloudflare')
+                            ->action('testCloudflare')
+                            ->color('success'),
+                    ])->fullWidth(),
+                ]),
+        ];
+    }
+
     protected function getFormStatePath(): ?string
     {
         return 'data';
@@ -579,6 +654,9 @@ class Settings extends Page implements HasSchemas
 
         foreach ($data as $key => $value) {
             if ($key === 'mail:mailers:smtp:password' && ! empty($value)) {
+                $value = $encrypter->encrypt($value);
+            }
+            if ($key === 'subdomains:cloudflare_api_token' && ! empty($value)) {
                 $value = $encrypter->encrypt($value);
             }
             $settings->set(
@@ -630,6 +708,55 @@ class Settings extends Page implements HasSchemas
         } catch (\Exception $exception) {
             Notification::make()
                 ->title(trans('admin/settings.mail.test-failed'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function testCloudflare(): void
+    {
+        $form = $this->getForm('form');
+        $data = $form?->getState() ?? [];
+
+        $apiToken = $data['subdomains:cloudflare_api_token'] ?? null;
+        $zoneId = $data['subdomains:cloudflare_zone_id'] ?? null;
+
+        if (empty($apiToken) || empty($zoneId)) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.test_failed'))
+                ->body(trans('admin/settings.subdomains.test_missing_fields'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$apiToken,
+            ])->get("https://api.cloudflare.com/client/v4/zones/{$zoneId}");
+
+            if ($response->successful() && $response->json('success')) {
+                $zoneName = $response->json('result.name', 'Unknown');
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.test_success'))
+                    ->body(sprintf('Zone: %s', $zoneName))
+                    ->success()
+                    ->send();
+            } else {
+                $error = collect($response->json('errors', []))->pluck('message')->join(', ');
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.test_failed'))
+                    ->body($error ?: 'Unknown error')
+                    ->danger()
+                    ->send();
+            }
+        } catch (\Exception $exception) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.test_failed'))
                 ->body($exception->getMessage())
                 ->danger()
                 ->send();

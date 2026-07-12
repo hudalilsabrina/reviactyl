@@ -1,0 +1,168 @@
+import { useEffect, useState } from 'react';
+import { ServerContext } from '@/state/server';
+import TitledGreyBox from '@/reviactyl/elements/TitledGreyBox';
+import { Button } from '@/reviactyl/elements/button/index';
+import Field from '@/reviactyl/elements/Field';
+import SpinnerOverlay from '@/reviactyl/elements/SpinnerOverlay';
+import { httpErrorToHuman } from '@/api/http';
+import { useStoreActions } from 'easy-peasy';
+import { ApplicationStore } from '@/state';
+import ConfirmationModal from '@/reviactyl/elements/ConfirmationModal';
+import CopyOnClick from '@/reviactyl/elements/CopyOnClick';
+import Input from '@/reviactyl/elements/Input';
+import Label from '@/reviactyl/elements/Label';
+import getSubdomains, { ServerSubdomain } from '@/api/server/subdomain/getSubdomains';
+import createSubdomain from '@/api/server/subdomain/createSubdomain';
+import updateSubdomain from '@/api/server/subdomain/updateSubdomain';
+import deleteSubdomain from '@/api/server/subdomain/deleteSubdomain';
+import tw from 'twin.macro';
+import { Form, Formik, FormikHelpers } from 'formik';
+import { object, string } from 'yup';
+import { useTranslation } from 'react-i18next';
+
+interface SubdomainFormValues {
+    subdomain: string;
+}
+
+const subdomainSchema = object().shape({
+    subdomain: string()
+        .required()
+        .min(3)
+        .max(63)
+        .matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Only lowercase letters, numbers, and hyphens allowed'),
+});
+
+const SubdomainBox = () => {
+    const { t } = useTranslation('server/settings');
+    const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
+    const setServer = ServerContext.useStoreActions((actions) => actions.server.setServer);
+    const server = ServerContext.useStoreState((state) => state.server.data!);
+    const { addError, clearFlashes } = useStoreActions(
+        (actions: import('easy-peasy').Actions<ApplicationStore>) => actions.flashes
+    );
+
+    const [subdomains, setSubdomains] = useState<ServerSubdomain[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showDelete, setShowDelete] = useState(false);
+
+    useEffect(() => {
+        getSubdomains(uuid)
+            .then((data) => setSubdomains(data))
+            .catch(() => {})
+            .then(() => setLoading(false));
+    }, [uuid]);
+
+    const currentSubdomain = subdomains[0] || null;
+    const hasSubdomain = !!currentSubdomain;
+
+    const handleCreate = (values: SubdomainFormValues, { setSubmitting }: FormikHelpers<SubdomainFormValues>) => {
+        clearFlashes('settings');
+        createSubdomain(uuid, values.subdomain)
+            .then((created) => {
+                setSubdomains([created]);
+                setServer({ ...server, subdomain: created.fqdn });
+            })
+            .catch((error) => {
+                addError({ key: 'settings', message: httpErrorToHuman(error) });
+            })
+            .then(() => setSubmitting(false));
+    };
+
+    const handleUpdate = (values: SubdomainFormValues, { setSubmitting }: FormikHelpers<SubdomainFormValues>) => {
+        if (!currentSubdomain) return;
+        clearFlashes('settings');
+        updateSubdomain(uuid, currentSubdomain.id, values.subdomain)
+            .then((updated) => {
+                setSubdomains([updated]);
+                setServer({ ...server, subdomain: updated.fqdn });
+            })
+            .catch((error) => {
+                addError({ key: 'settings', message: httpErrorToHuman(error) });
+            })
+            .then(() => setSubmitting(false));
+    };
+
+    const handleDelete = () => {
+        if (!currentSubdomain) return;
+        clearFlashes('settings');
+        deleteSubdomain(uuid, currentSubdomain.id)
+            .then(() => {
+                setSubdomains([]);
+                setServer({ ...server, subdomain: null });
+                setShowDelete(false);
+            })
+            .catch((error) => {
+                addError({ key: 'settings', message: httpErrorToHuman(error) });
+            });
+    };
+
+    if (loading) {
+        return (
+            <TitledGreyBox title={t('subdomain.title')} css={tw`relative`}>
+                <SpinnerOverlay visible />
+            </TitledGreyBox>
+        );
+    }
+
+    if (!hasSubdomain) {
+        return (
+            <TitledGreyBox title={t('subdomain.title')} css={tw`relative`}>
+                <p css={tw`text-sm text-gray-400 mb-4`}>{t('subdomain.no-subdomain')}</p>
+                <Formik onSubmit={handleCreate} initialValues={{ subdomain: '' }} validationSchema={subdomainSchema}>
+                    {() => (
+                        <Form css={tw`mb-0`}>
+                            <Field id={'subdomain'} name={'subdomain'} label={t('subdomain.prefix')} type={'text'} />
+                            <div css={tw`mt-6 text-right`}>
+                                <Button type={'submit'}>{t('subdomain.create')}</Button>
+                            </div>
+                        </Form>
+                    )}
+                </Formik>
+            </TitledGreyBox>
+        );
+    }
+
+    return (
+        <TitledGreyBox title={t('subdomain.title')} css={tw`relative`}>
+            <div css={tw`mb-4`}>
+                <Label>{t('subdomain.label')}</Label>
+                <CopyOnClick text={currentSubdomain.fqdn}>
+                    <Input type={'text'} value={currentSubdomain.fqdn} readOnly />
+                </CopyOnClick>
+                <p css={tw`text-xs text-gray-500 mt-1`}>
+                    {currentSubdomain.isAutoGenerated ? t('subdomain.auto-generated') : t('subdomain.custom')}
+                </p>
+            </div>
+            <Formik
+                onSubmit={handleUpdate}
+                initialValues={{ subdomain: currentSubdomain.subdomain }}
+                validationSchema={subdomainSchema}
+            >
+                {() => (
+                    <Form css={tw`mb-0`}>
+                        <Field id={'subdomain'} name={'subdomain'} label={t('subdomain.prefix')} type={'text'} />
+                        <div css={tw`mt-6 flex justify-between`}>
+                            <Button.Danger type={'button'} onClick={() => setShowDelete(true)}>
+                                {t('subdomain.delete')}
+                            </Button.Danger>
+                            <Button type={'submit'}>{t('subdomain.save')}</Button>
+                        </div>
+                    </Form>
+                )}
+            </Formik>
+            {showDelete && (
+                <ConfirmationModal
+                    title={t('subdomain.confirm-delete')}
+                    buttonText={t('subdomain.delete')}
+                    visible={showDelete}
+                    onConfirmed={handleDelete}
+                    onModalDismissed={() => setShowDelete(false)}
+                >
+                    <p css={tw`text-sm`}>{currentSubdomain.fqdn}</p>
+                </ConfirmationModal>
+            )}
+        </TitledGreyBox>
+    );
+};
+
+export default SubdomainBox;

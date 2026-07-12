@@ -167,4 +167,11 @@ Route::group([
         Route::put('/docker-image', [Client\Servers\SettingsController::class, 'dockerImage']);
         Route::put('/category', [Client\Servers\SettingsController::class, 'setCategory'])->name('api:client:server.settings.category');
     });
+
+    Route::group(['prefix' => '/subdomain'], function () {
+        Route::get('/', [Client\Servers\SubdomainController::class, 'index']);
+        Route::post('/', [Client\Servers\SubdomainController::class, 'store']);
+        Route::put('/{subdomain}', [Client\Servers\SubdomainController::class, 'update']);
+        Route::delete('/{subdomain}', [Client\Servers\SubdomainController::class, 'delete']);
+    });
 });

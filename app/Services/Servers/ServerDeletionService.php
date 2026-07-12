@@ -7,6 +7,7 @@ use App\Exceptions\Http\Connection\DaemonConnectionException;
 use App\Models\Server;
 use App\Repositories\Agent\DaemonServerRepository;
 use App\Services\Databases\DatabaseManagementService;
+use App\Services\Subdomains\SubdomainService;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +23,7 @@ class ServerDeletionService
         private ConnectionInterface $connection,
         private DaemonServerRepository $daemonServerRepository,
         private DatabaseManagementService $databaseManagementService,
+        private SubdomainService $subdomainService,
     ) {}
 
     /**
@@ -79,6 +81,9 @@ class ServerDeletionService
 
             // clear any allocation notes for the server
             $server->allocations()->update(['notes' => null]);
+
+            // Clean up subdomains and their Cloudflare DNS records
+            $this->subdomainService->deleteAllForServer($server);
 
             $server->delete();
         });
