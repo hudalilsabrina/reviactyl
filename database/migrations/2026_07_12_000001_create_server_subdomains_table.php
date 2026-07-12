@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('server_subdomains', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedMediumInteger('server_id');
+            $table->unsignedInteger('server_id');
             $table->string('subdomain', 63);
             $table->string('domain', 255);
             $table->string('record_id', 64)->nullable();
