@@ -25,6 +25,18 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, gd, bcmath, intl, posix, fileinfo
           coverage: none
 
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ matrix.php }}-
+
       - name: Install Composer Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
@@ -51,6 +63,18 @@ jobs:
 
       - name: Install pnpm
         run: npm install -g pnpm@11
+
+      - name: Get pnpm Store Directory
+        id: pnpm-cache
+        run: echo "dir=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.dir }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
