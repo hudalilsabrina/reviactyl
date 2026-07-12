@@ -21,5 +21,5 @@ export const rawDataToServerSubdomain = ({ attributes: data }: FractalResponseDa
 export default async (uuid: string): Promise<ServerSubdomain[]> => {
     const { data } = await http.get(`/api/client/servers/${uuid}/subdomain`);
 
-    return (data.data || []).map(rawDataToServerSubdomain);
+    return (data.data || []).map((item: any) => rawDataToServerSubdomain(item));
 };

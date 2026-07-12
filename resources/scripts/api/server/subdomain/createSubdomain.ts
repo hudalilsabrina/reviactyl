@@ -7,5 +7,5 @@ export default async (uuid: string, subdomain: string, domain?: string): Promise
         domain: domain || undefined,
     });
 
-    return rawDataToServerSubdomain(data);
+    return rawDataToServerSubdomain(data.data);
 };

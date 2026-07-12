@@ -4,7 +4,6 @@ namespace App\Services\Subdomains;
 
 use App\Contracts\Repository\SettingsRepositoryInterface;
 use App\Exceptions\DisplayException;
-use App\Models\Allocation;
 use App\Models\Server;
 use App\Models\ServerSubdomain;
 use Illuminate\Support\Str;

@@ -6,5 +6,5 @@ export default async (uuid: string, subdomainId: number, subdomain: string): Pro
         subdomain,
     });
 
-    return rawDataToServerSubdomain(data);
+    return rawDataToServerSubdomain(data.data);
 };

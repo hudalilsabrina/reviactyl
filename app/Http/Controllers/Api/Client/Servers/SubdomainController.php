@@ -6,6 +6,8 @@ use App\Exceptions\DisplayException;
 use App\Facades\Activity;
 use App\Http\Controllers\Api\Client\ClientApiController;
 use App\Http\Requests\Api\Client\Servers\Subdomain\CreateSubdomainRequest;
+use App\Http\Requests\Api\Client\Servers\Subdomain\DeleteSubdomainRequest;
+use App\Http\Requests\Api\Client\Servers\Subdomain\GetSubdomainsRequest;
 use App\Http\Requests\Api\Client\Servers\Subdomain\UpdateSubdomainRequest;
 use App\Models\Server;
 use App\Models\ServerSubdomain;
@@ -25,7 +27,7 @@ class SubdomainController extends ClientApiController
     /**
      * List all subdomains for a server.
      */
-    public function index(Server $server): array
+    public function index(GetSubdomainsRequest $request, Server $server): array
     {
         return $this->fractal->collection($server->subdomains)
             ->transformWith($this->getTransformer(ServerSubdomainTransformer::class))
@@ -87,7 +89,7 @@ class SubdomainController extends ClientApiController
     /**
      * Delete a subdomain.
      */
-    public function delete(Server $server, ServerSubdomain $subdomain): JsonResponse
+    public function delete(DeleteSubdomainRequest $request, Server $server, ServerSubdomain $subdomain): JsonResponse
     {
         if ($subdomain->server_id !== $server->id) {
             return new JsonResponse([], Response::HTTP_NOT_FOUND);
