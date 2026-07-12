@@ -1,0 +1,38 @@
+review:
+  profile: assertive
+  auto_review: true
+  path_instructions:
+    - glob: "app/Services/Subdomains/**"
+      instruction: "Check for security vulnerabilities in Cloudflare API handling and DNS operations"
+    - glob: "app/Http/Controllers/Api/Client/**"
+      instruction: "Verify authorization and input validation"
+    - glob: "app/Models/**"
+      instruction: "Check mass assignment protection and relationship integrity"
+    - glob: "database/migrations/**"
+      instruction: "Verify foreign key constraints and indexing"
+    - glob: "resources/scripts/**/*.tsx"
+      instruction: "Check for React best practices and type safety"
+  ignore_paths:
+    - "public/build/**"
+    - "node_modules/**"
+    - "vendor/**"
+
+repair:
+  auto_fix: true
+  min_confidence: 60
+  skip_branches:
+    - "release/*"
+
+analysis:
+  dead_code: true
+  security_scan: true
+  predictive_ci: true
+
+quality_gates:
+  - name: "No console.log in production"
+    rule: "No console.log in resources/scripts/** files"
+  - name: "No raw SQL"
+    rule: "No raw SQL queries, use Eloquent ORM"
+
+chat:
+  enabled: true
