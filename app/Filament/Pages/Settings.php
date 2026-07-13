@@ -157,6 +157,16 @@ class Settings extends Page implements HasSchemas
             $formData[$key] = $value;
         }
 
+        // Decode JSON array fields for multi-select components
+        foreach (['subdomains:cloudflare_zone_ids'] as $jsonKey) {
+            if (isset($formData[$jsonKey]) && is_string($formData[$jsonKey])) {
+                $decoded = json_decode($formData[$jsonKey], true);
+                if (is_array($decoded)) {
+                    $formData[$jsonKey] = $decoded;
+                }
+            }
+        }
+
         $form = $this->getForm('form');
 
         if ($form !== null) {
@@ -751,7 +761,7 @@ class Settings extends Page implements HasSchemas
             }
             $settings->set(
                 'settings::'.$key,
-                is_bool($value) ? ($value ? 'true' : 'false') : $value
+                is_bool($value) ? ($value ? 'true' : 'false') : (is_array($value) ? json_encode($value) : $value)
             );
         }
 
