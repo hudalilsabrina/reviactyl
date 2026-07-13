@@ -61,7 +61,10 @@ const SortablePartItem = ({
             <div
                 {...attributes}
                 {...listeners}
-                css={[tw`text-gray-500 hover:text-gray-300 p-1`, { cursor: 'grab', '&:active': { cursor: 'grabbing' } }]}
+                css={[
+                    tw`text-gray-500 hover:text-gray-300 p-1`,
+                    { cursor: 'grab', '&:active': { cursor: 'grabbing' } },
+                ]}
             >
                 <svg css={tw`w-5 h-5`} fill='none' viewBox='0 0 24 24' stroke='currentColor'>
                     <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 8h16M4 16h16' />
