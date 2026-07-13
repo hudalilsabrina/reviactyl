@@ -638,22 +638,19 @@ class Settings extends Page implements HasSchemas
                         ->revealable()
                         ->visible(fn ($get) => $get('subdomains:enabled'))
                         ->live(onBlur: true)
-                        ->columnSpan(3),
-
-                    Actions::make([
-                        Action::make('fetch_zones')
-                            ->label(trans('admin/settings.subdomains.fetch_zones'))
-                            ->icon('tabler-cloud-search')
-                            ->action('fetchZones')
-                            ->color('info'),
-                    ])->visible(fn ($get) => $get('subdomains:enabled'))->columnSpan(1)->alignEnd(),
+                        ->afterStateUpdated(function (Set $set, mixed $state): void {
+                            if (filled($state)) {
+                                $this->fetchZonesFromToken($state, $set);
+                            }
+                        })
+                        ->columnSpan(4),
 
                     Select::make('subdomains:cloudflare_zone_id')
                         ->label(trans('admin/settings.subdomains.zone_id'))
                         ->helperText(trans('admin/settings.subdomains.zone_id_helper'))
                         ->options(fn () => $this->zoneOptions)
                         ->searchable()
-                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_api_token')))
                         ->live()
                         ->afterStateUpdated(function (Set $set, mixed $state): void {
                             $zoneName = $this->zoneOptions[$state] ?? null;
@@ -668,7 +665,7 @@ class Settings extends Page implements HasSchemas
                         ->label(trans('admin/settings.subdomains.base_domain'))
                         ->placeholder('srv.example.com')
                         ->helperText(trans('admin/settings.subdomains.base_domain_helper'))
-                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_zone_id')))
                         ->columnSpan(2),
 
                     TextInput::make('subdomains:max_per_server')
@@ -877,8 +874,16 @@ class Settings extends Page implements HasSchemas
             return;
         }
 
+        $this->fetchZonesFromToken($apiToken);
+    }
+
+    /**
+     * Fetch Cloudflare zones from an API token and populate the zone dropdown.
+     */
+    private function fetchZonesFromToken(string $apiToken, ?Set $set = null): void
+    {
         try {
-            $response = Http::withHeaders([
+            $response = Http::timeout(10)->withHeaders([
                 'Authorization' => 'Bearer '.$apiToken,
             ])->get('https://api.cloudflare.com/client/v4/zones', [
                 'per_page' => 50,
@@ -891,6 +896,8 @@ class Settings extends Page implements HasSchemas
                     ->all();
 
                 if (empty($zones)) {
+                    $this->zoneOptions = [];
+
                     Notification::make()
                         ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
                         ->body(trans('admin/settings.subdomains.no_zones_found'))
@@ -902,12 +909,20 @@ class Settings extends Page implements HasSchemas
 
                 $this->zoneOptions = $zones;
 
+                // Auto-select if only one zone
+                if (count($zones) === 1 && $set) {
+                    $zoneId = array_key_first($zones);
+                    $set('subdomains:cloudflare_zone_id', $zoneId);
+                    $set('subdomains:base_domain', $zones[$zoneId]);
+                }
+
                 Notification::make()
                     ->title(trans('admin/settings.subdomains.fetch_zones_success'))
                     ->body(sprintf('Found %d zone(s)', count($zones)))
                     ->success()
                     ->send();
             } else {
+                $this->zoneOptions = [];
                 $error = collect($response->json('errors', []))->pluck('message')->join(', ');
 
                 Notification::make()
@@ -917,6 +932,8 @@ class Settings extends Page implements HasSchemas
                     ->send();
             }
         } catch (\Exception $exception) {
+            $this->zoneOptions = [];
+
             Notification::make()
                 ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
                 ->body($exception->getMessage())
