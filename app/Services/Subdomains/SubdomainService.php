@@ -92,6 +92,17 @@ class SubdomainService
             throw new DisplayException('Subdomain management is not enabled.');
         }
 
+        $maxPerServer = $this->getMaxPerServer();
+        $currentCount = ServerSubdomain::where('server_id', $server->id)
+            ->where('is_auto_generated', false)
+            ->count();
+
+        if ($currentCount >= $maxPerServer) {
+            throw new DisplayException(
+                "You have reached the maximum number of custom subdomains ({$maxPerServer}) for this server."
+            );
+        }
+
         $domain = $customDomain ?? $this->getBaseDomain();
         $fullDomain = $subdomain.'.'.$domain;
 
@@ -283,5 +294,10 @@ class SubdomainService
     private function getZoneId(): ?string
     {
         return $this->settings->get('settings::subdomains:cloudflare_zone_id', null);
+    }
+
+    public function getMaxPerServer(): int
+    {
+        return (int) $this->settings->get('settings::subdomains:max_per_server', 1);
     }
 }

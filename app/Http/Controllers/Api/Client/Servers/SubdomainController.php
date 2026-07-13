@@ -29,9 +29,18 @@ class SubdomainController extends ClientApiController
      */
     public function index(GetSubdomainsRequest $request, Server $server): array
     {
-        return $this->fractal->collection($server->subdomains)
+        $subdomains = $this->fractal->collection($server->subdomains)
             ->transformWith($this->getTransformer(ServerSubdomainTransformer::class))
             ->toArray();
+
+        return array_merge($subdomains, [
+            'meta' => [
+                'max_per_server' => $this->subdomainService->getMaxPerServer(),
+                'custom_count' => ServerSubdomain::where('server_id', $server->id)
+                    ->where('is_auto_generated', false)
+                    ->count(),
+            ],
+        ]);
     }
 
     /**

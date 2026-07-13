@@ -88,6 +88,8 @@ return [
         'test_success' => 'Cloudflare connection successful',
         'test_failed' => 'Cloudflare connection failed',
         'test_missing_fields' => 'Please fill in the API token and Zone ID first.',
+        'max_per_server' => 'Max Custom Subdomains Per Server',
+        'max_per_server_helper' => 'Maximum number of custom subdomains a user can create per server. Set to 0 to disable custom subdomains (auto-generated only).',
     ],
     'social' => [
         'title' => 'Social Login',

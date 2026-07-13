@@ -90,6 +90,7 @@ class Settings extends Page implements HasSchemas
         'subdomains:cloudflare_api_token',
         'subdomains:cloudflare_zone_id',
         'subdomains:base_domain',
+        'subdomains:max_per_server',
     ];
 
     public function getHeading(): string
@@ -619,6 +620,17 @@ class Settings extends Page implements HasSchemas
                         ->helperText(trans('admin/settings.subdomains.api_token_helper'))
                         ->password()
                         ->revealable()
+                        ->required(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->columnSpan(4),
+
+                    TextInput::make('subdomains:max_per_server')
+                        ->label(trans('admin/settings.subdomains.max_per_server'))
+                        ->helperText(trans('admin/settings.subdomains.max_per_server_helper'))
+                        ->numeric()
+                        ->default(1)
+                        ->minValue(0)
+                        ->maxValue(100)
                         ->required(fn ($get) => $get('subdomains:enabled'))
                         ->visible(fn ($get) => $get('subdomains:enabled'))
                         ->columnSpan(4),

@@ -46,5 +46,7 @@ return [
         'created' => 'Subdomain created successfully',
         'create' => 'Create Subdomain',
         'not-configured' => 'Subdomain management is not configured by the administrator.',
+        'quota' => ':count / :max custom subdomains used',
+        'quota_reached' => 'You have reached the maximum number of custom subdomains for this server.',
     ],
 ];
