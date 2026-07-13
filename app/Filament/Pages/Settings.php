@@ -7,6 +7,7 @@ use App\Filament\Components\ImageInput;
 use App\Notifications\MailTested;
 use App\Traits\Helpers\AvailableLanguages;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -604,6 +605,17 @@ class Settings extends Page implements HasSchemas
     private function subdomainSettings(): array
     {
         return [
+            Section::make(trans('admin/settings.subdomains.setup_guide'))
+                ->icon('tabler-info-circle')
+                ->collapsible()
+                ->collapsed()
+                ->columnSpanFull()
+                ->schema([
+                    Placeholder::make('setup_guide_content')
+                        ->content(trans('admin/settings.subdomains.setup_guide_content'))
+                        ->columnSpanFull(),
+                ]),
+
             Section::make(trans('admin/settings.subdomains.cloudflare'))
                 ->columns(4)
                 ->icon('tabler-brand-cloudflare')

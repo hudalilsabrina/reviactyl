@@ -95,6 +95,34 @@ return [
         'test_missing_fields' => 'Please fill in the API token and Zone ID first.',
         'max_per_server' => 'Max Subdomains Per Server',
         'max_per_server_helper' => 'Maximum number of subdomains a server can have. Set to 0 for unlimited.',
+        'setup_guide' => 'Setup Guide',
+        'setup_guide_content' => <<<'EOT'
+## Quick Setup
+
+**Step 1 — Create a Cloudflare API Token**
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens)
+2. Click **Create Token**
+3. Use the **Edit zone DNS** template (or create custom)
+4. Under **Zone Resources**, select **Include → Specific zone → your domain**
+5. Click **Continue to summary** → **Create Token**
+6. Copy the token (you won't see it again)
+
+**Step 2 — Configure This Panel**
+
+1. Paste the API token in the field below
+2. Click **Fetch Zones** to load your domains
+3. Select your zone from the dropdown
+4. The base domain auto-fills — edit it to add a prefix (e.g., `srv.example.com`)
+5. Set max subdomains per server (0 = unlimited)
+6. Click **Save**
+
+**Step 3 — Done!**
+
+New servers will auto-get a subdomain like `my-server.srv.example.com`. Users can customize it from their server settings page.
+
+**Note:** The API token needs `Zone:Zone:Read` and `Zone:DNS:Edit` permissions.
+EOT,
     ],
     'social' => [
         'title' => 'Social Login',
