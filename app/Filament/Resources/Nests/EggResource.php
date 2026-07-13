@@ -211,24 +211,33 @@ class EggResource extends Resource
                                     ->schema([
                                         Forms\Components\TextInput::make('name')
                                             ->required()
-                                            ->maxLength(191),
-                                        Forms\Components\TextInput::make('value')
+                                            ->maxLength(191)
+                                            ->columnSpan(1),
+                                        Forms\Components\TextInput::make('group_name')
+                                            ->label('Group')
+                                            ->maxLength(191)
+                                            ->columnSpan(1),
+                                        Forms\Components\Textarea::make('value')
                                             ->required()
-                                            ->maxLength(191),
+                                            ->rows(2)
+                                            ->maxLength(191)
+                                            ->columnSpanFull(),
                                         Forms\Components\Textarea::make('description')
+                                            ->rows(2)
                                             ->maxLength(500)
                                             ->columnSpanFull(),
-                                        Forms\Components\TextInput::make('group_name')
-                                            ->maxLength(191),
                                         Forms\Components\Toggle::make('default_enabled')
-                                            ->label('Enabled by default'),
+                                            ->label('Enabled by default')
+                                            ->columnSpan(1),
                                         Forms\Components\Toggle::make('required')
-                                            ->label('Required (cannot be disabled)'),
+                                            ->label('Required')
+                                            ->columnSpan(1),
                                         Forms\Components\TextInput::make('sort_order')
                                             ->numeric()
-                                            ->default(0),
+                                            ->default(0)
+                                            ->columnSpan(1),
                                     ])
-                                    ->columns(2)
+                                    ->columns(3)
                                     ->defaultItems(0)
                                     ->reorderableWithButtons()
                                     ->collapsible()
