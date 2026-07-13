@@ -647,7 +647,7 @@ class Settings extends Page implements HasSchemas
                             ->icon('tabler-cloud-search')
                             ->action('fetchZones')
                             ->color('info'),
-                    ])->columnSpan(1)->alignEnd(),
+                    ])->visible(fn ($get) => $get('subdomains:enabled'))->columnSpan(1)->alignEnd(),
 
                     Select::make('subdomains:cloudflare_zone_id')
                         ->label(trans('admin/settings.subdomains.zone_id'))
