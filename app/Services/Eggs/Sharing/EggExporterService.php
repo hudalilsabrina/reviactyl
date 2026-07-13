@@ -5,6 +5,7 @@ namespace App\Services\Eggs\Sharing;
 use App\Contracts\Repository\EggRepositoryInterface;
 use App\Exceptions\Repository\RecordNotFoundException;
 use App\Models\Egg;
+use App\Models\EggStartupPart;
 use App\Models\EggVariable;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -59,6 +60,11 @@ class EggExporterService
                 return Collection::make($item->toArray())
                     ->except(['id', 'egg_id', 'created_at', 'updated_at'])
                     ->merge(['field_type' => 'text'])
+                    ->toArray();
+            }),
+            'startup_parts' => $egg->startupParts->transform(function (EggStartupPart $item) {
+                return Collection::make($item->toArray())
+                    ->except(['id', 'egg_id', 'created_at', 'updated_at'])
                     ->toArray();
             }),
         ];

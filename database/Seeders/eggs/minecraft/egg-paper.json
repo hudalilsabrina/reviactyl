@@ -80,5 +80,61 @@
             "rules": "required|string|max:20",
             "field_type": "text"
         }
+    ],
+    "startup_parts": [
+        {
+            "name": "UseG1GC",
+            "value": "-XX:+UseG1GC",
+            "description": "Use the G1 Garbage Collector for better performance.",
+            "default_enabled": true,
+            "required": false,
+            "sort_order": 0,
+            "group_name": "Garbage Collection"
+        },
+        {
+            "name": "ParallelRefProcEnabled",
+            "value": "-XX:+ParallelRefProcEnabled",
+            "description": "Enable parallel reference processing for GC.",
+            "default_enabled": true,
+            "required": false,
+            "sort_order": 1,
+            "group_name": "Garbage Collection"
+        },
+        {
+            "name": "MaxGCPauseMillis",
+            "value": "-XX:MaxGCPauseMillis=200",
+            "description": "Target max GC pause time in milliseconds.",
+            "default_enabled": false,
+            "required": false,
+            "sort_order": 2,
+            "group_name": "Garbage Collection"
+        },
+        {
+            "name": "AlwaysPreTouch",
+            "value": "-XX:+AlwaysPreTouch",
+            "description": "Pre-touch memory pages during JVM initialization.",
+            "default_enabled": false,
+            "required": false,
+            "sort_order": 3,
+            "group_name": "Performance"
+        },
+        {
+            "name": "DisableAttachMechanism",
+            "value": "-XX:+DisableAttachMechanism",
+            "description": "Disable the JVM attach mechanism for security.",
+            "default_enabled": false,
+            "required": false,
+            "sort_order": 4,
+            "group_name": "Security"
+        },
+        {
+            "name": "UseAikarFlags",
+            "value": "-XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:TargetSurvivorRatio=90 -XX:G1MixedGCCountTarget=4",
+            "description": "Aikar's optimized G1GC tuning flags for Minecraft servers.",
+            "default_enabled": false,
+            "required": false,
+            "sort_order": 5,
+            "group_name": "Tuning"
+        }
     ]
 }

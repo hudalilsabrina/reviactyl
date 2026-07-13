@@ -4,6 +4,7 @@ namespace App\Services\Eggs\Sharing;
 
 use App\Exceptions\Service\InvalidFileUploadException;
 use App\Models\Egg;
+use App\Models\EggStartupPart;
 use App\Models\EggVariable;
 use App\Models\Nest;
 use App\Services\Eggs\EggParserService;
@@ -42,6 +43,10 @@ class EggImporterService
 
             foreach ($parsed['variables'] ?? [] as $variable) {
                 EggVariable::query()->forceCreate(array_merge($variable, ['egg_id' => $egg->id]));
+            }
+
+            foreach ($parsed['startup_parts'] ?? [] as $part) {
+                EggStartupPart::query()->forceCreate(array_merge($part, ['egg_id' => $egg->id]));
             }
 
             return $egg;

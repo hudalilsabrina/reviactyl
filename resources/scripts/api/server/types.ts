@@ -28,6 +28,18 @@ export interface ServerEggVariable {
     rules: string[];
 }
 
+export interface StartupPart {
+    id: number;
+    name: string;
+    value: string;
+    description: string | null;
+    defaultEnabled: boolean;
+    required: boolean;
+    sortOrder: number;
+    groupName: string | null;
+    userEnabled: boolean;
+}
+
 export interface ServerCategory {
     uuid: string;
     name: string;
