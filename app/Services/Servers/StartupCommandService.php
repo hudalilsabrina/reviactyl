@@ -52,8 +52,8 @@ class StartupCommandService
             $choice = collect($userChoices)->firstWhere('part_id', $part->id);
             $enabled = $choice['enabled'] ?? $part->default_enabled;
 
-            if ($enabled) {
-                $enabledValues[] = $part->value;
+            if ($enabled && ! empty(trim($part->value))) {
+                $enabledValues[] = trim($part->value);
             }
         }
 

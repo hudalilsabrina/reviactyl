@@ -74,6 +74,7 @@ class StartupModificationService
             $server = $server->forceFill([
                 'egg_id' => $egg->id,
                 'nest_id' => $egg->nest_id,
+                'startup_parts' => null,
             ]);
         }
 

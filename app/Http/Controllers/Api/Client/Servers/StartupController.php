@@ -132,20 +132,31 @@ class StartupController extends ClientApiController
     public function updateParts(UpdateStartupPartsRequest $request, Server $server): array
     {
         $eggParts = $server->egg->startupParts;
+
+        if ($eggParts->isEmpty()) {
+            throw new BadRequestHttpException('This server does not have configurable startup parts.');
+        }
+
         $requestedParts = $request->input('parts', []);
 
         // Validate that all part IDs belong to this server's egg
         $validPartIds = $eggParts->pluck('id')->toArray();
+        $seenIds = [];
+
         foreach ($requestedParts as $part) {
             if (! in_array($part['part_id'], $validPartIds)) {
                 throw new BadRequestHttpException('Invalid startup part ID: '.$part['part_id']);
             }
+            if (in_array($part['part_id'], $seenIds)) {
+                throw new BadRequestHttpException('Duplicate startup part ID: '.$part['part_id']);
+            }
+            $seenIds[] = $part['part_id'];
         }
 
-        // Validate required parts can't be disabled
+        // Validate required parts — must be present AND enabled
         foreach ($eggParts->where('required', true) as $requiredPart) {
             $choice = collect($requestedParts)->firstWhere('part_id', $requiredPart->id);
-            if ($choice && ! $choice['enabled']) {
+            if (! $choice || ! $choice['enabled']) {
                 throw new BadRequestHttpException("The startup part '{$requiredPart->name}' is required and cannot be disabled.");
             }
         }
