@@ -11,8 +11,10 @@ export interface ServerSubdomain {
 
 export interface SubdomainResponse {
     subdomains: ServerSubdomain[];
-    maxPerServer: number;
-    customCount: number;
+    meta: {
+        maxPerServer: number;
+        customCount: number;
+    };
 }
 
 export const rawDataToServerSubdomain = ({ attributes: data }: FractalResponseData): ServerSubdomain => ({
@@ -28,8 +30,10 @@ export default async (uuid: string): Promise<SubdomainResponse> => {
     const { data } = await http.get(`/api/client/servers/${uuid}/subdomain`);
 
     return {
-        subdomains: (data.data || []).map((item: any) => rawDataToServerSubdomain(item)),
-        maxPerServer: data.meta?.max_per_server ?? 1,
-        customCount: data.meta?.custom_count ?? 0,
+        subdomains: (data.data || []).map(rawDataToServerSubdomain),
+        meta: {
+            maxPerServer: data.meta?.max_per_server ?? 1,
+            customCount: data.meta?.custom_count ?? 0,
+        },
     };
 };

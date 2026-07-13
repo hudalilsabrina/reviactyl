@@ -718,8 +718,17 @@ class Settings extends Page implements HasSchemas
             if ($key === 'mail:mailers:smtp:password' && ! empty($value)) {
                 $value = $encrypter->encrypt($value);
             }
+            // Only encrypt if value is not already encrypted (e.g. mount failed to decrypt)
             if ($key === 'subdomains:cloudflare_api_token' && ! empty($value)) {
-                $value = $encrypter->encrypt($value);
+                $alreadyEncrypted = true;
+                try {
+                    $encrypter->decrypt($value);
+                } catch (\Throwable) {
+                    $alreadyEncrypted = false;
+                }
+                if (! $alreadyEncrypted) {
+                    $value = $encrypter->encrypt($value);
+                }
             }
             $settings->set(
                 'settings::'.$key,
@@ -839,14 +848,6 @@ class Settings extends Page implements HasSchemas
                 ->send();
 
             return;
-        }
-
-        // If token looks encrypted (stored value), decrypt it first
-        if (! str_starts_with($apiToken, 'ey')) {
-            try {
-                $apiToken = app(Encrypter::class)->decrypt($apiToken);
-            } catch (\Throwable) {
-            }
         }
 
         try {

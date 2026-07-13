@@ -6,6 +6,7 @@ use App\Contracts\Repository\SettingsRepositoryInterface;
 use App\Exceptions\DisplayException;
 use App\Models\Server;
 use App\Models\ServerSubdomain;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -39,8 +40,6 @@ class SubdomainService
 
     /**
      * Auto-create a subdomain for a server based on its name.
-     *
-     * @throws DisplayException
      */
     public function createAutoSubdomain(Server $server): ?ServerSubdomain
     {
@@ -71,14 +70,25 @@ class SubdomainService
             return null;
         }
 
-        return ServerSubdomain::create([
-            'server_id' => $server->id,
-            'subdomain' => $subdomain,
-            'domain' => $baseDomain,
-            'record_id' => $recordId,
-            'ip_address' => $ipAddress,
-            'is_auto_generated' => true,
-        ]);
+        try {
+            return ServerSubdomain::create([
+                'server_id' => $server->id,
+                'subdomain' => $subdomain,
+                'domain' => $baseDomain,
+                'record_id' => $recordId,
+                'ip_address' => $ipAddress,
+                'is_auto_generated' => true,
+            ]);
+        } catch (QueryException $e) {
+            // Race condition: another process created the same slug — clean up CF record
+            Log::warning('Subdomain auto-create race condition, cleaning up Cloudflare record', [
+                'server_id' => $server->id,
+                'domain' => $fullDomain,
+            ]);
+            $cloudflare->deleteRecord($recordId);
+
+            return null;
+        }
     }
 
     /**
@@ -86,24 +96,27 @@ class SubdomainService
      *
      * @throws DisplayException
      */
-    public function createCustomSubdomain(Server $server, string $subdomain, ?string $customDomain = null): ServerSubdomain
+    public function createCustomSubdomain(Server $server, string $subdomain): ServerSubdomain
     {
         if (! $this->isEnabled()) {
             throw new DisplayException('Subdomain management is not enabled.');
         }
 
         $maxPerServer = $this->getMaxPerServer();
-        $currentCount = ServerSubdomain::where('server_id', $server->id)
-            ->where('is_auto_generated', false)
-            ->count();
+        if ($maxPerServer > 0) {
+            $currentCount = ServerSubdomain::where('server_id', $server->id)
+                ->where('is_auto_generated', false)
+                ->count();
 
-        if ($currentCount >= $maxPerServer) {
-            throw new DisplayException(
-                "You have reached the maximum number of custom subdomains ({$maxPerServer}) for this server."
-            );
+            if ($currentCount >= $maxPerServer) {
+                throw new DisplayException(
+                    "You have reached the maximum number of custom subdomains ({$maxPerServer}) for this server."
+                );
+            }
         }
 
-        $domain = $customDomain ?? $this->getBaseDomain();
+        // Always use configured base domain — don't allow arbitrary domains
+        $domain = $this->getBaseDomain();
         $fullDomain = $subdomain.'.'.$domain;
 
         // Check if this subdomain is already used
@@ -132,18 +145,25 @@ class SubdomainService
             throw new DisplayException('Failed to create DNS record in Cloudflare.');
         }
 
-        return ServerSubdomain::create([
-            'server_id' => $server->id,
-            'subdomain' => $subdomain,
-            'domain' => $domain,
-            'record_id' => $recordId,
-            'ip_address' => $ipAddress,
-            'is_auto_generated' => false,
-        ]);
+        try {
+            return ServerSubdomain::create([
+                'server_id' => $server->id,
+                'subdomain' => $subdomain,
+                'domain' => $domain,
+                'record_id' => $recordId,
+                'ip_address' => $ipAddress,
+                'is_auto_generated' => false,
+            ]);
+        } catch (QueryException $e) {
+            // Race condition: another process created the same subdomain — clean up CF record
+            $cloudflare->deleteRecord($recordId);
+            throw new DisplayException("The subdomain '{$fullDomain}' is already in use.");
+        }
     }
 
     /**
      * Update a subdomain's prefix.
+     * Creates the new DNS record first, then deletes the old one to avoid downtime.
      *
      * @throws DisplayException
      */
@@ -167,21 +187,21 @@ class SubdomainService
 
         $cloudflare = $this->getCloudflareService();
 
-        // Delete old record
+        // Create new record FIRST — if this fails, old record stays intact
+        $newRecordId = $cloudflare->createARecord($fullDomain, $subdomain->ip_address);
+
+        if (! $newRecordId) {
+            throw new DisplayException('Failed to create new DNS record in Cloudflare. The old subdomain remains active.');
+        }
+
+        // Now delete old record (best-effort, don't fail if it's already gone)
         if ($subdomain->record_id) {
             $cloudflare->deleteRecord($subdomain->record_id);
         }
 
-        // Create new record
-        $recordId = $cloudflare->createARecord($fullDomain, $subdomain->ip_address);
-
-        if (! $recordId) {
-            throw new DisplayException('Failed to create DNS record in Cloudflare.');
-        }
-
         $subdomain->update([
             'subdomain' => $newSubdomain,
-            'record_id' => $recordId,
+            'record_id' => $newRecordId,
         ]);
 
         return $subdomain->refresh();
@@ -202,24 +222,41 @@ class SubdomainService
 
     /**
      * Delete all subdomains for a server (used during server deletion).
+     * Cloudflare cleanup is best-effort — DB rows are always deleted.
      */
     public function deleteAllForServer(Server $server): void
     {
-        if (! $this->isEnabled()) {
-            // Still clean up DB records even if Cloudflare is disabled
-            ServerSubdomain::where('server_id', $server->id)->delete();
+        $subdomains = ServerSubdomain::where('server_id', $server->id)->get();
 
+        if ($subdomains->isEmpty()) {
             return;
         }
 
-        $cloudflare = $this->getCloudflareService();
-
-        ServerSubdomain::where('server_id', $server->id)->each(function (ServerSubdomain $subdomain) use ($cloudflare) {
-            if ($subdomain->record_id) {
-                $cloudflare->deleteRecord($subdomain->record_id);
+        // Best-effort Cloudflare cleanup — don't let failures block server deletion
+        if ($this->isEnabled()) {
+            try {
+                $cloudflare = $this->getCloudflareService();
+                foreach ($subdomains as $subdomain) {
+                    if ($subdomain->record_id) {
+                        try {
+                            $cloudflare->deleteRecord($subdomain->record_id);
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to delete Cloudflare record during server cleanup', [
+                                'record_id' => $subdomain->record_id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to initialize Cloudflare service during server cleanup', [
+                    'error' => $e->getMessage(),
+                ]);
             }
-            $subdomain->delete();
-        });
+        }
+
+        // Always delete DB rows regardless of Cloudflare success
+        ServerSubdomain::where('server_id', $server->id)->delete();
     }
 
     /**
@@ -250,6 +287,7 @@ class SubdomainService
 
     /**
      * Generate a unique subdomain slug from a server name.
+     * The DB unique constraint on (subdomain, domain) is the source of truth.
      */
     private function generateUniqueSlug(string $name, int $serverId, string $domain): string
     {
@@ -268,14 +306,21 @@ class SubdomainService
             $slug = 'srv-'.$serverId;
         }
 
-        // Ensure uniqueness
+        // Ensure uniqueness (DB unique constraint is the final guard)
         $original = $slug;
         $counter = 1;
+        $maxAttempts = 100;
 
         while (ServerSubdomain::where('subdomain', $slug)->where('domain', $domain)->exists()) {
             $suffix = '-'.$counter;
             $slug = substr($original, 0, 63 - strlen($suffix)).$suffix;
             $counter++;
+
+            if ($counter > $maxAttempts) {
+                // Fallback to UUID-based slug
+                $slug = 'srv-'.Str::random(8);
+                break;
+            }
         }
 
         return $slug;

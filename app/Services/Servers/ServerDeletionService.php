@@ -58,6 +58,10 @@ class ServerDeletionService
             Log::warning($exception);
         }
 
+        // Clean up Cloudflare DNS records OUTSIDE the transaction to avoid
+        // orphaned records if the transaction rolls back.
+        $this->subdomainService->deleteAllForServer($server);
+
         $this->connection->transaction(function () use ($server) {
             foreach ($server->databases as $database) {
                 try {
@@ -81,9 +85,6 @@ class ServerDeletionService
 
             // clear any allocation notes for the server
             $server->allocations()->update(['notes' => null]);
-
-            // Clean up subdomains and their Cloudflare DNS records
-            $this->subdomainService->deleteAllForServer($server);
 
             $server->delete();
         });

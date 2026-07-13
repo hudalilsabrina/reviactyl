@@ -20,6 +20,7 @@ return new class extends Migration
 
             $table->foreign('server_id')->references('id')->on('servers')->cascadeOnDelete();
             $table->unique(['server_id', 'domain']);
+            $table->unique(['subdomain', 'domain']);
         });
     }
 

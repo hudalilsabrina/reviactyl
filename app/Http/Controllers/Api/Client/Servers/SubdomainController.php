@@ -54,7 +54,6 @@ class SubdomainController extends ClientApiController
             $result = $this->subdomainService->createCustomSubdomain(
                 server: $server,
                 subdomain: $request->input('subdomain'),
-                customDomain: $request->input('domain'),
             );
 
             $log->subject($result)->property('subdomain', $result->fqdn);

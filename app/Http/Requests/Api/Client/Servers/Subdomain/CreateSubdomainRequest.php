@@ -17,7 +17,6 @@ class CreateSubdomainRequest extends ClientApiRequest implements ClientPermissio
     {
         return [
             'subdomain' => 'required|string|max:63|regex:/^[a-z0-9][a-z0-9\-]*[a-z0-9]$/',
-            'domain' => 'nullable|string|max:255',
         ];
     }
 }
