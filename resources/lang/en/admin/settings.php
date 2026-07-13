@@ -97,31 +97,28 @@ return [
         'max_per_server_helper' => 'Maximum number of subdomains a server can have. Set to 0 for unlimited.',
         'setup_guide' => 'Setup Guide',
         'setup_guide_content' => <<<'EOT'
-## Quick Setup
-
-**Step 1 — Create a Cloudflare API Token**
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens)
-2. Click **Create Token**
-3. Use the **Edit zone DNS** template (or create custom)
-4. Under **Zone Resources**, select **Include → Specific zone → your domain**
-5. Click **Continue to summary** → **Create Token**
-6. Copy the token (you won't see it again)
-
-**Step 2 — Configure This Panel**
-
-1. Paste the API token in the field below
-2. Click **Fetch Zones** to load your domains
-3. Select your zone from the dropdown
-4. The base domain auto-fills — edit it to add a prefix (e.g., `srv.example.com`)
-5. Set max subdomains per server (0 = unlimited)
-6. Click **Save**
-
-**Step 3 — Done!**
-
-New servers will auto-get a subdomain like `my-server.srv.example.com`. Users can customize it from their server settings page.
-
-**Note:** The API token needs `Zone:Zone:Read` and `Zone:DNS:Edit` permissions.
+<h3>Quick Setup</h3>
+<p><strong>Step 1 — Create a Cloudflare API Token</strong></p>
+<ol>
+<li>Go to <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="color: #60a5fa; text-decoration: underline;">Cloudflare Dashboard → API Tokens</a></li>
+<li>Click <strong>Create Token</strong></li>
+<li>Use the <strong>Edit zone DNS</strong> template (or create custom)</li>
+<li>Under <strong>Zone Resources</strong>, select <strong>Include → Specific zone → your domain</strong></li>
+<li>Click <strong>Continue to summary</strong> → <strong>Create Token</strong></li>
+<li>Copy the token (you won't see it again)</li>
+</ol>
+<p><strong>Step 2 — Configure This Panel</strong></p>
+<ol>
+<li>Paste the API token in the field below</li>
+<li>Click <strong>Fetch Zones</strong> to load your domains</li>
+<li>Select your zone from the dropdown</li>
+<li>The base domain auto-fills — edit it to add a prefix (e.g., <code>srv.example.com</code>)</li>
+<li>Set max subdomains per server (0 = unlimited)</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<p><strong>Step 3 — Done!</strong></p>
+<p>New servers will auto-get a subdomain like <code>my-server.srv.example.com</code>. Users can customize it from their server settings page.</p>
+<p><em>Note: The API token needs <strong>Zone:Zone:Read</strong> and <strong>Zone:DNS:Edit</strong> permissions.</em></p>
 EOT,
     ],
     'social' => [

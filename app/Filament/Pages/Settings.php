@@ -28,6 +28,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class Settings extends Page implements HasSchemas
@@ -612,7 +613,7 @@ class Settings extends Page implements HasSchemas
                 ->columnSpanFull()
                 ->schema([
                     Placeholder::make('setup_guide_content')
-                        ->content(trans('admin/settings.subdomains.setup_guide_content'))
+                        ->content(new HtmlString(trans('admin/settings.subdomains.setup_guide_content')))
                         ->columnSpanFull(),
                 ]),
 
