@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Console\Kernel;
@@ -41,6 +42,8 @@ class Settings extends Page implements HasSchemas
     protected string $view = 'filament.pages.settings';
 
     public ?array $data = [];
+
+    protected array $zoneOptions = [];
 
     protected array $settingKeys = [
         'app:name',
@@ -156,6 +159,21 @@ class Settings extends Page implements HasSchemas
 
         if ($form !== null) {
             $form->fill($formData);
+        }
+
+        // Populate zone options from saved zone ID so the Select shows the saved value
+        $savedZoneId = $formData['subdomains:cloudflare_zone_id'] ?? null;
+        if (! empty($savedZoneId) && ! empty($formData['subdomains:cloudflare_api_token'])) {
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$formData['subdomains:cloudflare_api_token'],
+                ])->get("https://api.cloudflare.com/client/v4/zones/{$savedZoneId}");
+
+                if ($response->successful() && $response->json('success')) {
+                    $this->zoneOptions = [$savedZoneId => $response->json('result.name', $savedZoneId)];
+                }
+            } catch (\Throwable) {
+            }
         }
     }
 
@@ -600,21 +618,6 @@ class Settings extends Page implements HasSchemas
                         ->live()
                         ->columnSpan(4),
 
-                    TextInput::make('subdomains:base_domain')
-                        ->label(trans('admin/settings.subdomains.base_domain'))
-                        ->placeholder('srv.example.com')
-                        ->helperText(trans('admin/settings.subdomains.base_domain_helper'))
-                        ->required(fn ($get) => $get('subdomains:enabled'))
-                        ->visible(fn ($get) => $get('subdomains:enabled'))
-                        ->columnSpan(2),
-
-                    TextInput::make('subdomains:cloudflare_zone_id')
-                        ->label(trans('admin/settings.subdomains.zone_id'))
-                        ->helperText(trans('admin/settings.subdomains.zone_id_helper'))
-                        ->required(fn ($get) => $get('subdomains:enabled'))
-                        ->visible(fn ($get) => $get('subdomains:enabled'))
-                        ->columnSpan(2),
-
                     TextInput::make('subdomains:cloudflare_api_token')
                         ->label(trans('admin/settings.subdomains.api_token'))
                         ->helperText(trans('admin/settings.subdomains.api_token_helper'))
@@ -622,7 +625,41 @@ class Settings extends Page implements HasSchemas
                         ->revealable()
                         ->required(fn ($get) => $get('subdomains:enabled'))
                         ->visible(fn ($get) => $get('subdomains:enabled'))
-                        ->columnSpan(4),
+                        ->live(onBlur: true)
+                        ->columnSpan(3),
+
+                    Actions::make([
+                        Action::make('fetch_zones')
+                            ->label(trans('admin/settings.subdomains.fetch_zones'))
+                            ->icon('tabler-cloud-search')
+                            ->action('fetchZones')
+                            ->color('info'),
+                    ])->columnSpan(1)->alignEnd(),
+
+                    Select::make('subdomains:cloudflare_zone_id')
+                        ->label(trans('admin/settings.subdomains.zone_id'))
+                        ->helperText(trans('admin/settings.subdomains.zone_id_helper'))
+                        ->options(fn () => $this->zoneOptions)
+                        ->searchable()
+                        ->required(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, mixed $state): void {
+                            $zoneName = $this->zoneOptions[$state] ?? null;
+                            if ($zoneName) {
+                                $set('subdomains:base_domain', $zoneName);
+                            }
+                        })
+                        ->native(false)
+                        ->columnSpan(2),
+
+                    TextInput::make('subdomains:base_domain')
+                        ->label(trans('admin/settings.subdomains.base_domain'))
+                        ->placeholder('srv.example.com')
+                        ->helperText(trans('admin/settings.subdomains.base_domain_helper'))
+                        ->required(fn ($get) => $get('subdomains:enabled'))
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->columnSpan(2),
 
                     TextInput::make('subdomains:max_per_server')
                         ->label(trans('admin/settings.subdomains.max_per_server'))
@@ -769,6 +806,78 @@ class Settings extends Page implements HasSchemas
         } catch (\Exception $exception) {
             Notification::make()
                 ->title(trans('admin/settings.subdomains.test_failed'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function fetchZones(): void
+    {
+        $form = $this->getForm('form');
+        $data = $form?->getState() ?? [];
+        $apiToken = $data['subdomains:cloudflare_api_token'] ?? null;
+
+        if (empty($apiToken)) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
+                ->body(trans('admin/settings.subdomains.test_missing_token'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        // If token looks encrypted (stored value), decrypt it first
+        if (! str_starts_with($apiToken, 'ey')) {
+            try {
+                $apiToken = app(Encrypter::class)->decrypt($apiToken);
+            } catch (\Throwable) {
+            }
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$apiToken,
+            ])->get('https://api.cloudflare.com/client/v4/zones', [
+                'per_page' => 50,
+                'status' => 'active',
+            ]);
+
+            if ($response->successful() && $response->json('success')) {
+                $zones = collect($response->json('result', []))
+                    ->mapWithKeys(fn ($zone) => [$zone['id'] => $zone['name']])
+                    ->all();
+
+                if (empty($zones)) {
+                    Notification::make()
+                        ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
+                        ->body(trans('admin/settings.subdomains.no_zones_found'))
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                $this->zoneOptions = $zones;
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.fetch_zones_success'))
+                    ->body(sprintf('Found %d zone(s)', count($zones)))
+                    ->success()
+                    ->send();
+            } else {
+                $error = collect($response->json('errors', []))->pluck('message')->join(', ');
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
+                    ->body($error ?: 'Unknown error')
+                    ->danger()
+                    ->send();
+            }
+        } catch (\Exception $exception) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
                 ->body($exception->getMessage())
                 ->danger()
                 ->send();
