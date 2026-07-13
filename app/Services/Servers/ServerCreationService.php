@@ -22,6 +22,7 @@ use App\Services\Subdomains\SubdomainService;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -111,7 +112,14 @@ class ServerCreationService
         }
 
         // Auto-create subdomain if subdomain feature is enabled
-        $this->subdomainService->createAutoSubdomain($server);
+        try {
+            $this->subdomainService->createAutoSubdomain($server);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to auto-create subdomain for server', [
+                'server_id' => $server->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         return $server;
     }

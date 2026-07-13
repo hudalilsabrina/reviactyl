@@ -6,6 +6,7 @@ use App\Contracts\Repository\SettingsRepositoryInterface;
 use App\Exceptions\DisplayException;
 use App\Models\Server;
 use App\Models\ServerSubdomain;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SubdomainService
@@ -49,17 +50,24 @@ class SubdomainService
 
         $ipAddress = $this->resolveAllocationIp($server);
         if (! $ipAddress) {
+            Log::warning('Subdomain auto-create skipped: no resolvable IP', ['server_id' => $server->id]);
+
             return null;
         }
 
         $baseDomain = $this->getBaseDomain();
-        $subdomain = $this->generateUniqueSlug($server->name, $baseDomain);
+        $subdomain = $this->generateUniqueSlug($server->name, $server->id, $baseDomain);
         $fullDomain = $subdomain.'.'.$baseDomain;
 
         $cloudflare = $this->getCloudflareService();
         $recordId = $cloudflare->createARecord($fullDomain, $ipAddress);
 
         if (! $recordId) {
+            Log::error('Subdomain auto-create failed: Cloudflare DNS error', [
+                'server_id' => $server->id,
+                'domain' => $fullDomain,
+            ]);
+
             return null;
         }
 
@@ -232,18 +240,30 @@ class SubdomainService
     /**
      * Generate a unique subdomain slug from a server name.
      */
-    private function generateUniqueSlug(string $name, string $domain): string
+    private function generateUniqueSlug(string $name, int $serverId, string $domain): string
     {
-        // Sanitize: lowercase, replace spaces/special chars with hyphens
         $slug = Str::slug($name, '-');
-        $slug = substr($slug, 0, 63); // Max 63 chars for DNS label
+
+        // Fallback for names that produce empty slugs (emoji, non-Latin, all special chars)
+        if (strlen($slug) < 2) {
+            $slug = 'srv-'.$serverId;
+        }
+
+        $slug = substr($slug, 0, 63);
+
+        // Strip trailing hyphens (DNS label must end with alphanumeric)
+        $slug = rtrim($slug, '-');
+        if (strlen($slug) < 2) {
+            $slug = 'srv-'.$serverId;
+        }
 
         // Ensure uniqueness
         $original = $slug;
         $counter = 1;
 
         while (ServerSubdomain::where('subdomain', $slug)->where('domain', $domain)->exists()) {
-            $slug = substr($original, 0, 60 - strlen((string) $counter)).'-'.$counter;
+            $suffix = '-'.$counter;
+            $slug = substr($original, 0, 63 - strlen($suffix)).$suffix;
             $counter++;
         }
 
