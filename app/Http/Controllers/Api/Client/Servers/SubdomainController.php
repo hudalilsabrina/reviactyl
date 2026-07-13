@@ -39,6 +39,7 @@ class SubdomainController extends ClientApiController
                 'custom_count' => ServerSubdomain::where('server_id', $server->id)
                     ->where('is_auto_generated', false)
                     ->count(),
+                'available_domains' => $this->subdomainService->getBaseDomains(),
             ],
         ]);
     }
@@ -54,6 +55,7 @@ class SubdomainController extends ClientApiController
             $result = $this->subdomainService->createCustomSubdomain(
                 server: $server,
                 subdomain: $request->input('subdomain'),
+                domain: $request->input('domain'),
             );
 
             $log->subject($result)->property('subdomain', $result->fqdn);

@@ -14,6 +14,7 @@ export interface SubdomainResponse {
     meta: {
         maxPerServer: number;
         customCount: number;
+        availableDomains: string[];
     };
 }
 
@@ -34,6 +35,7 @@ export default async (uuid: string): Promise<SubdomainResponse> => {
         meta: {
             maxPerServer: data.meta?.max_per_server ?? 1,
             customCount: data.meta?.custom_count ?? 0,
+            availableDomains: data.meta?.available_domains ?? [],
         },
     };
 };

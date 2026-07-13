@@ -45,6 +45,8 @@ return [
         'deleted' => 'Subdomain deleted successfully',
         'created' => 'Subdomain created successfully',
         'create' => 'Create Subdomain',
+        'select_domain' => 'Select Domain',
+        'preview' => 'Your subdomain will be',
         'not-configured' => 'Subdomain management is not configured by the administrator.',
         'quota' => ':count / :max custom subdomains used',
         'quota_reached' => 'You have reached the maximum number of custom subdomains for this server.',

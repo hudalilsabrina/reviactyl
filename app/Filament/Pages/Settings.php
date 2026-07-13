@@ -45,7 +45,7 @@ class Settings extends Page implements HasSchemas
 
     public ?array $data = [];
 
-    protected array $zoneOptions = [];
+    public array $zoneOptions = [];
 
     protected array $settingKeys = [
         'app:name',
@@ -93,8 +93,8 @@ class Settings extends Page implements HasSchemas
 
         'subdomains:enabled',
         'subdomains:cloudflare_api_token',
-        'subdomains:cloudflare_zone_id',
-        'subdomains:base_domain',
+        'subdomains:cloudflare_zone_ids',
+        'subdomains:base_domains',
         'subdomains:max_per_server',
     ];
 
@@ -163,16 +163,32 @@ class Settings extends Page implements HasSchemas
             $form->fill($formData);
         }
 
-        // Populate zone options from saved zone ID so the Select shows the saved value
-        $savedZoneId = $formData['subdomains:cloudflare_zone_id'] ?? null;
-        if (! empty($savedZoneId) && ! empty($formData['subdomains:cloudflare_api_token'])) {
+        // Populate zone options from saved zone IDs so the Select shows the saved values
+        $savedZoneIds = $formData['subdomains:cloudflare_zone_ids'] ?? null;
+        $apiToken = $formData['subdomains:cloudflare_api_token'] ?? null;
+
+        if (! empty($savedZoneIds) && ! empty($apiToken)) {
+            // Handle both JSON array and comma-separated formats
+            if (is_string($savedZoneIds)) {
+                $zoneIds = str_starts_with($savedZoneIds, '[')
+                    ? json_decode($savedZoneIds, true)
+                    : array_map('trim', explode(',', $savedZoneIds));
+            } else {
+                $zoneIds = (array) $savedZoneIds;
+            }
+
             try {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$formData['subdomains:cloudflare_api_token'],
-                ])->get("https://api.cloudflare.com/client/v4/zones/{$savedZoneId}");
+                $response = Http::timeout(10)->withHeaders([
+                    'Authorization' => 'Bearer '.$apiToken,
+                ])->get('https://api.cloudflare.com/client/v4/zones', [
+                    'per_page' => 50,
+                    'status' => 'active',
+                ]);
 
                 if ($response->successful() && $response->json('success')) {
-                    $this->zoneOptions = [$savedZoneId => $response->json('result.name', $savedZoneId)];
+                    $this->zoneOptions = collect($response->json('result', []))
+                        ->mapWithKeys(fn ($zone) => [$zone['id'] => $zone['name']])
+                        ->all();
                 }
             } catch (\Throwable) {
             }
@@ -645,28 +661,33 @@ class Settings extends Page implements HasSchemas
                         })
                         ->columnSpan(4),
 
-                    Select::make('subdomains:cloudflare_zone_id')
-                        ->label(trans('admin/settings.subdomains.zone_id'))
-                        ->helperText(trans('admin/settings.subdomains.zone_id_helper'))
+                    Select::make('subdomains:cloudflare_zone_ids')
+                        ->label(trans('admin/settings.subdomains.zone_ids'))
+                        ->helperText(trans('admin/settings.subdomains.zone_ids_helper'))
                         ->options(fn () => $this->zoneOptions)
                         ->searchable()
+                        ->multiple()
                         ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_api_token')))
                         ->live()
                         ->afterStateUpdated(function (Set $set, mixed $state): void {
-                            $zoneName = $this->zoneOptions[$state] ?? null;
-                            if ($zoneName) {
-                                $set('subdomains:base_domain', $zoneName);
+                            // Auto-fill base domains from selected zone names
+                            $domains = [];
+                            foreach ((array) $state as $zoneId) {
+                                if (isset($this->zoneOptions[$zoneId])) {
+                                    $domains[] = $this->zoneOptions[$zoneId];
+                                }
                             }
+                            $set('subdomains:base_domains', implode(',', $domains));
                         })
                         ->native(false)
-                        ->columnSpan(2),
+                        ->columnSpan(4),
 
-                    TextInput::make('subdomains:base_domain')
-                        ->label(trans('admin/settings.subdomains.base_domain'))
-                        ->placeholder('srv.example.com')
-                        ->helperText(trans('admin/settings.subdomains.base_domain_helper'))
-                        ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_zone_id')))
-                        ->columnSpan(2),
+                    TextInput::make('subdomains:base_domains')
+                        ->label(trans('admin/settings.subdomains.base_domains'))
+                        ->placeholder('example.com, example.org')
+                        ->helperText(trans('admin/settings.subdomains.base_domains_helper'))
+                        ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_zone_ids')))
+                        ->columnSpan(4),
 
                     TextInput::make('subdomains:max_per_server')
                         ->label(trans('admin/settings.subdomains.max_per_server'))
@@ -754,11 +775,11 @@ class Settings extends Page implements HasSchemas
         if (empty($data['subdomains:cloudflare_api_token'])) {
             $missing[] = trans('admin/settings.subdomains.api_token');
         }
-        if (empty($data['subdomains:cloudflare_zone_id'])) {
-            $missing[] = trans('admin/settings.subdomains.zone_id');
+        if (empty($data['subdomains:cloudflare_zone_ids'])) {
+            $missing[] = trans('admin/settings.subdomains.zone_ids');
         }
-        if (empty($data['subdomains:base_domain'])) {
-            $missing[] = trans('admin/settings.subdomains.base_domain');
+        if (empty($data['subdomains:base_domains'])) {
+            $missing[] = trans('admin/settings.subdomains.base_domains');
         }
 
         if (! empty($missing)) {
@@ -768,7 +789,6 @@ class Settings extends Page implements HasSchemas
                 ->danger()
                 ->send();
 
-            // Halt save by throwing
             throw new \RuntimeException('Missing required subdomain fields.');
         }
     }

@@ -11,9 +11,9 @@ import ConfirmationModal from '@/reviactyl/elements/ConfirmationModal';
 import CopyOnClick from '@/reviactyl/elements/CopyOnClick';
 import Input from '@/reviactyl/elements/Input';
 import Label from '@/reviactyl/elements/Label';
+import Select from '@/reviactyl/elements/Select';
 import getSubdomains, { ServerSubdomain } from '@/api/server/subdomain/getSubdomains';
 import createSubdomain from '@/api/server/subdomain/createSubdomain';
-import updateSubdomain from '@/api/server/subdomain/updateSubdomain';
 import deleteSubdomain from '@/api/server/subdomain/deleteSubdomain';
 import tw from 'twin.macro';
 import { Form, Formik, FormikHelpers } from 'formik';
@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 interface SubdomainFormValues {
     subdomain: string;
+    domain: string;
 }
 
 const subdomainSchema = object().shape({
@@ -30,6 +31,7 @@ const subdomainSchema = object().shape({
         .min(3)
         .max(63)
         .matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Only lowercase letters, numbers, and hyphens allowed'),
+    domain: string().required(),
 });
 
 const SubdomainBox = () => {
@@ -44,10 +46,11 @@ const SubdomainBox = () => {
     const [subdomains, setSubdomains] = useState<ServerSubdomain[]>([]);
     const [loading, setLoading] = useState(true);
     const [showDelete, setShowDelete] = useState(false);
-    const [meta, setMeta] = useState<{ maxPerServer: number; customCount: number }>({
-        maxPerServer: 1,
-        customCount: 0,
-    });
+    const [meta, setMeta] = useState<{
+        maxPerServer: number;
+        customCount: number;
+        availableDomains: string[];
+    }>({ maxPerServer: 1, customCount: 0, availableDomains: [] });
 
     useEffect(() => {
         getSubdomains(uuid)
@@ -61,15 +64,15 @@ const SubdomainBox = () => {
             .then(() => setLoading(false));
     }, [uuid]);
 
-    const currentSubdomain = subdomains[0] || null;
-    const hasSubdomain = !!currentSubdomain;
+    const hasSubdomain = subdomains.length > 0;
     const canCreate = meta.maxPerServer === 0 || meta.customCount < meta.maxPerServer;
+    const hasMultipleDomains = meta.availableDomains.length > 1;
 
     const handleCreate = (values: SubdomainFormValues, { setSubmitting }: FormikHelpers<SubdomainFormValues>) => {
         clearFlashes('settings');
-        createSubdomain(uuid, values.subdomain)
+        createSubdomain(uuid, values.subdomain, values.domain)
             .then((created) => {
-                setSubdomains([created]);
+                setSubdomains([...subdomains, created]);
                 setServer({ ...server, subdomain: created.fqdn });
                 setMeta((prev) => ({ ...prev, customCount: prev.customCount + 1 }));
             })
@@ -79,27 +82,13 @@ const SubdomainBox = () => {
             .then(() => setSubmitting(false));
     };
 
-    const handleUpdate = (values: SubdomainFormValues, { setSubmitting }: FormikHelpers<SubdomainFormValues>) => {
-        if (!currentSubdomain) return;
+    const handleDelete = (subdomainId: number) => {
         clearFlashes('settings');
-        updateSubdomain(uuid, currentSubdomain.id, values.subdomain)
-            .then((updated) => {
-                setSubdomains([updated]);
-                setServer({ ...server, subdomain: updated.fqdn });
-            })
-            .catch((error) => {
-                addError({ key: 'settings', message: httpErrorToHuman(error) });
-            })
-            .then(() => setSubmitting(false));
-    };
-
-    const handleDelete = () => {
-        if (!currentSubdomain) return;
-        clearFlashes('settings');
-        deleteSubdomain(uuid, currentSubdomain.id)
+        deleteSubdomain(uuid, subdomainId)
             .then(() => {
-                setSubdomains([]);
-                setServer({ ...server, subdomain: null });
+                const remaining = subdomains.filter((s) => s.id !== subdomainId);
+                setSubdomains(remaining);
+                setServer({ ...server, subdomain: remaining[0]?.fqdn ?? null });
                 setShowDelete(false);
             })
             .catch((error) => {
@@ -115,75 +104,94 @@ const SubdomainBox = () => {
         );
     }
 
-    if (!hasSubdomain) {
+    if (!hasSubdomain && !canCreate) {
         return (
             <TitledGreyBox title={t('subdomain.title')} css={tw`relative`}>
-                <p css={tw`text-sm text-gray-400 mb-4`}>{t('subdomain.no-subdomain')}</p>
-                {canCreate ? (
-                    <Formik
-                        onSubmit={handleCreate}
-                        initialValues={{ subdomain: '' }}
-                        validationSchema={subdomainSchema}
-                    >
-                        {() => (
-                            <Form css={tw`mb-0`}>
-                                <Field
-                                    id={'subdomain'}
-                                    name={'subdomain'}
-                                    label={t('subdomain.prefix')}
-                                    type={'text'}
-                                />
-                                <div css={tw`mt-6 text-right`}>
-                                    <Button type={'submit'}>{t('subdomain.create')}</Button>
-                                </div>
-                            </Form>
-                        )}
-                    </Formik>
-                ) : (
-                    <p css={tw`text-sm text-gray-500`}>{t('subdomain.quota_reached')}</p>
-                )}
+                <p css={tw`text-sm text-gray-400`}>{t('subdomain.no-subdomain')}</p>
+                <p css={tw`text-sm text-gray-500 mt-2`}>{t('subdomain.quota_reached')}</p>
             </TitledGreyBox>
         );
     }
 
     return (
         <TitledGreyBox title={t('subdomain.title')} css={tw`relative`}>
-            <div css={tw`mb-4`}>
-                <Label>{t('subdomain.label')}</Label>
-                <CopyOnClick text={currentSubdomain.fqdn}>
-                    <Input type={'text'} value={currentSubdomain.fqdn} readOnly />
-                </CopyOnClick>
-                <p css={tw`text-xs text-gray-500 mt-1`}>
-                    {currentSubdomain.isAutoGenerated ? t('subdomain.auto-generated') : t('subdomain.custom')}
-                </p>
-            </div>
-            <Formik
-                onSubmit={handleUpdate}
-                initialValues={{ subdomain: currentSubdomain.subdomain }}
-                validationSchema={subdomainSchema}
-            >
-                {() => (
-                    <Form css={tw`mb-0`}>
-                        <Field id={'subdomain'} name={'subdomain'} label={t('subdomain.prefix')} type={'text'} />
-                        <div css={tw`mt-6 flex justify-between`}>
-                            <Button.Danger type={'button'} onClick={() => setShowDelete(true)}>
-                                {t('subdomain.delete')}
-                            </Button.Danger>
-                            <Button type={'submit'}>{t('subdomain.save')}</Button>
+            {/* Existing subdomains */}
+            {subdomains.length > 0 && (
+                <div css={tw`mb-4 space-y-3`}>
+                    {subdomains.map((sub) => (
+                        <div key={sub.id} css={tw`flex items-center gap-3`}>
+                            <div css={tw`flex-1`}>
+                                <CopyOnClick text={sub.fqdn}>
+                                    <Input type={'text'} value={sub.fqdn} readOnly />
+                                </CopyOnClick>
+                                <p css={tw`text-xs text-gray-500 mt-1`}>
+                                    {sub.isAutoGenerated ? t('subdomain.auto-generated') : t('subdomain.custom')}
+                                </p>
+                            </div>
+                            <button
+                                type={'button'}
+                                css={tw`text-sm p-2 text-gray-600 hover:text-red-600 transition-colors duration-150`}
+                                onClick={() => setShowDelete(true)}
+                            >
+                                ×
+                            </button>
+                            {showDelete && (
+                                <ConfirmationModal
+                                    title={t('subdomain.confirm-delete')}
+                                    buttonText={t('subdomain.delete')}
+                                    visible={showDelete}
+                                    onConfirmed={() => handleDelete(sub.id)}
+                                    onModalDismissed={() => setShowDelete(false)}
+                                >
+                                    <p css={tw`text-sm`}>{sub.fqdn}</p>
+                                </ConfirmationModal>
+                            )}
                         </div>
-                    </Form>
-                )}
-            </Formik>
-            {showDelete && (
-                <ConfirmationModal
-                    title={t('subdomain.confirm-delete')}
-                    buttonText={t('subdomain.delete')}
-                    visible={showDelete}
-                    onConfirmed={handleDelete}
-                    onModalDismissed={() => setShowDelete(false)}
+                    ))}
+                </div>
+            )}
+
+            {/* Create new subdomain */}
+            {canCreate && (
+                <Formik
+                    onSubmit={handleCreate}
+                    initialValues={{
+                        subdomain: '',
+                        domain: meta.availableDomains[0] || '',
+                    }}
+                    validationSchema={subdomainSchema}
                 >
-                    <p css={tw`text-sm`}>{currentSubdomain.fqdn}</p>
-                </ConfirmationModal>
+                    {({ values, setFieldValue }) => (
+                        <Form css={tw`mb-0`}>
+                            {hasMultipleDomains && (
+                                <div css={tw`mb-4`}>
+                                    <Label>{t('subdomain.select_domain')}</Label>
+                                    <Select
+                                        value={values.domain}
+                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                                            setFieldValue('domain', e.target.value)
+                                        }
+                                    >
+                                        {meta.availableDomains.map((d) => (
+                                            <option key={d} value={d}>
+                                                {d}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </div>
+                            )}
+                            <Field id={'subdomain'} name={'subdomain'} label={t('subdomain.prefix')} type={'text'} />
+                            {values.domain && (
+                                <p css={tw`text-xs text-gray-500 mt-1`}>
+                                    {t('subdomain.preview')}: {values.subdomain || '...'}.{values.domain}
+                                </p>
+                            )}
+                            <div css={tw`mt-6 text-right`}>
+                                <Button type={'submit'}>{t('subdomain.create')}</Button>
+                            </div>
+                        </Form>
+                    )}
+                </Formik>
             )}
         </TitledGreyBox>
     );

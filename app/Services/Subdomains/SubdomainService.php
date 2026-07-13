@@ -22,19 +22,74 @@ class SubdomainService
     public function isEnabled(): bool
     {
         return $this->settings->get('settings::subdomains:enabled', false)
-            && filled($this->getBaseDomain())
-            && filled($this->getApiToken())
-            && filled($this->getZoneId());
+            && ! empty($this->getBaseDomains())
+            && filled($this->getApiToken());
     }
 
     /**
-     * Get the Cloudflare DNS service instance.
+     * Get base domains as an array.
+     *
+     * @return string[]
      */
-    public function getCloudflareService(): CloudflareDnsService
+    public function getBaseDomains(): array
+    {
+        $raw = $this->settings->get('settings::subdomains:base_domains', '');
+
+        if (empty($raw)) {
+            return [];
+        }
+
+        return array_filter(array_map('trim', explode(',', $raw)));
+    }
+
+    /**
+     * Get zone IDs as an array.
+     *
+     * @return string[]
+     */
+    public function getZoneIds(): array
+    {
+        $raw = $this->settings->get('settings::subdomains:cloudflare_zone_ids', '');
+
+        if (empty($raw)) {
+            return [];
+        }
+
+        // Handle JSON array format
+        if (str_starts_with($raw, '[')) {
+            return array_filter(json_decode($raw, true) ?? []);
+        }
+
+        return array_filter(array_map('trim', explode(',', $raw)));
+    }
+
+    /**
+     * Get the zone ID for a specific base domain.
+     * Zone IDs and base domains are stored as parallel arrays.
+     */
+    public function getZoneIdForDomain(string $domain): ?string
+    {
+        $domains = $this->getBaseDomains();
+        $zoneIds = $this->getZoneIds();
+
+        $index = array_search($domain, $domains, true);
+
+        if ($index === false || ! isset($zoneIds[$index])) {
+            // Fallback to first zone ID
+            return $zoneIds[0] ?? null;
+        }
+
+        return $zoneIds[$index];
+    }
+
+    /**
+     * Get the Cloudflare DNS service instance for a specific zone.
+     */
+    public function getCloudflareService(string $zoneId): CloudflareDnsService
     {
         return new CloudflareDnsService(
             apiToken: $this->getApiToken(),
-            zoneId: $this->getZoneId(),
+            zoneId: $zoneId,
         );
     }
 
@@ -54,11 +109,13 @@ class SubdomainService
             return null;
         }
 
-        $baseDomain = $this->getBaseDomain();
+        // Use the first configured domain for auto-generated subdomains
+        $baseDomain = $this->getBaseDomains()[0];
         $subdomain = $this->generateUniqueSlug($server->name, $server->id, $baseDomain);
         $fullDomain = $subdomain.'.'.$baseDomain;
 
-        $cloudflare = $this->getCloudflareService();
+        $zoneId = $this->getZoneIdForDomain($baseDomain);
+        $cloudflare = $this->getCloudflareService($zoneId);
         $recordId = $cloudflare->createARecord($fullDomain, $ipAddress);
 
         if (! $recordId) {
@@ -80,7 +137,6 @@ class SubdomainService
                 'is_auto_generated' => true,
             ]);
         } catch (QueryException $e) {
-            // Race condition: another process created the same slug — clean up CF record
             Log::warning('Subdomain auto-create race condition, cleaning up Cloudflare record', [
                 'server_id' => $server->id,
                 'domain' => $fullDomain,
@@ -96,7 +152,7 @@ class SubdomainService
      *
      * @throws DisplayException
      */
-    public function createCustomSubdomain(Server $server, string $subdomain): ServerSubdomain
+    public function createCustomSubdomain(Server $server, string $subdomain, ?string $domain = null): ServerSubdomain
     {
         if (! $this->isEnabled()) {
             throw new DisplayException('Subdomain management is not enabled.');
@@ -115,8 +171,14 @@ class SubdomainService
             }
         }
 
-        // Always use configured base domain — don't allow arbitrary domains
-        $domain = $this->getBaseDomain();
+        // Validate domain is one of the configured base domains
+        $baseDomains = $this->getBaseDomains();
+        $domain = $domain ?? $baseDomains[0];
+
+        if (! in_array($domain, $baseDomains, true)) {
+            throw new DisplayException("The domain '{$domain}' is not configured for subdomains.");
+        }
+
         $fullDomain = $subdomain.'.'.$domain;
 
         // Check if this subdomain is already used
@@ -129,7 +191,9 @@ class SubdomainService
         }
 
         // Check Cloudflare too
-        $cloudflare = $this->getCloudflareService();
+        $zoneId = $this->getZoneIdForDomain($domain);
+        $cloudflare = $this->getCloudflareService($zoneId);
+
         if ($cloudflare->recordExists($fullDomain)) {
             throw new DisplayException("A DNS record for '{$fullDomain}' already exists in Cloudflare.");
         }
@@ -155,7 +219,6 @@ class SubdomainService
                 'is_auto_generated' => false,
             ]);
         } catch (QueryException $e) {
-            // Race condition: another process created the same subdomain — clean up CF record
             $cloudflare->deleteRecord($recordId);
             throw new DisplayException("The subdomain '{$fullDomain}' is already in use.");
         }
@@ -185,7 +248,8 @@ class SubdomainService
             throw new DisplayException("The subdomain '{$fullDomain}' is already in use.");
         }
 
-        $cloudflare = $this->getCloudflareService();
+        $zoneId = $this->getZoneIdForDomain($subdomain->domain);
+        $cloudflare = $this->getCloudflareService($zoneId);
 
         // Create new record FIRST — if this fails, old record stays intact
         $newRecordId = $cloudflare->createARecord($fullDomain, $subdomain->ip_address);
@@ -213,7 +277,8 @@ class SubdomainService
     public function deleteSubdomain(ServerSubdomain $subdomain): bool
     {
         if ($subdomain->record_id) {
-            $cloudflare = $this->getCloudflareService();
+            $zoneId = $this->getZoneIdForDomain($subdomain->domain);
+            $cloudflare = $this->getCloudflareService($zoneId);
             $cloudflare->deleteRecord($subdomain->record_id);
         }
 
@@ -234,24 +299,32 @@ class SubdomainService
 
         // Best-effort Cloudflare cleanup — don't let failures block server deletion
         if ($this->isEnabled()) {
-            try {
-                $cloudflare = $this->getCloudflareService();
-                foreach ($subdomains as $subdomain) {
-                    if ($subdomain->record_id) {
-                        try {
-                            $cloudflare->deleteRecord($subdomain->record_id);
-                        } catch (\Throwable $e) {
-                            Log::warning('Failed to delete Cloudflare record during server cleanup', [
-                                'record_id' => $subdomain->record_id,
-                                'error' => $e->getMessage(),
-                            ]);
+            // Group subdomains by domain to minimize zone lookups
+            $byDomain = $subdomains->groupBy('domain');
+
+            foreach ($byDomain as $domain => $domainSubdomains) {
+                try {
+                    $zoneId = $this->getZoneIdForDomain($domain);
+                    $cloudflare = $this->getCloudflareService($zoneId);
+
+                    foreach ($domainSubdomains as $subdomain) {
+                        if ($subdomain->record_id) {
+                            try {
+                                $cloudflare->deleteRecord($subdomain->record_id);
+                            } catch (\Throwable $e) {
+                                Log::warning('Failed to delete Cloudflare record during server cleanup', [
+                                    'record_id' => $subdomain->record_id,
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
                         }
                     }
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to initialize Cloudflare service during server cleanup', [
+                        'domain' => $domain,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Failed to initialize Cloudflare service during server cleanup', [
-                    'error' => $e->getMessage(),
-                ]);
             }
         }
 
@@ -271,12 +344,10 @@ class SubdomainService
 
         $ip = $allocation->ip;
 
-        // If it's already an IP, return it
         if (filter_var($ip, FILTER_VALIDATE_IP)) {
             return $ip;
         }
 
-        // Try to resolve hostname to IP
         $resolved = @gethostbyname($ip);
         if (filter_var($resolved, FILTER_VALIDATE_IP) && $resolved !== $ip) {
             return $resolved;
@@ -287,26 +358,22 @@ class SubdomainService
 
     /**
      * Generate a unique subdomain slug from a server name.
-     * The DB unique constraint on (subdomain, domain) is the source of truth.
      */
     private function generateUniqueSlug(string $name, int $serverId, string $domain): string
     {
         $slug = Str::slug($name, '-');
 
-        // Fallback for names that produce empty slugs (emoji, non-Latin, all special chars)
         if (strlen($slug) < 2) {
             $slug = 'srv-'.$serverId;
         }
 
         $slug = substr($slug, 0, 63);
-
-        // Strip trailing hyphens (DNS label must end with alphanumeric)
         $slug = rtrim($slug, '-');
+
         if (strlen($slug) < 2) {
             $slug = 'srv-'.$serverId;
         }
 
-        // Ensure uniqueness (DB unique constraint is the final guard)
         $original = $slug;
         $counter = 1;
         $maxAttempts = 100;
@@ -317,7 +384,6 @@ class SubdomainService
             $counter++;
 
             if ($counter > $maxAttempts) {
-                // Fallback to UUID-based slug
                 $slug = 'srv-'.Str::random(8);
                 break;
             }
@@ -326,19 +392,9 @@ class SubdomainService
         return $slug;
     }
 
-    private function getBaseDomain(): ?string
-    {
-        return $this->settings->get('settings::subdomains:base_domain', null);
-    }
-
     private function getApiToken(): ?string
     {
         return $this->settings->get('settings::subdomains:cloudflare_api_token', null);
-    }
-
-    private function getZoneId(): ?string
-    {
-        return $this->settings->get('settings::subdomains:cloudflare_zone_id', null);
     }
 
     public function getMaxPerServer(): int
