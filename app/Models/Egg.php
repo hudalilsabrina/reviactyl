@@ -49,6 +49,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property Nest $nest
  * @property Collection|Server[] $servers
  * @property Collection|EggVariable[] $variables
+ * @property Collection|EggStartupPart[] $startupParts
  * @property Egg|null $scriptFrom
  * @property Egg|null $configFrom
  */
@@ -301,6 +302,16 @@ class Egg extends Model implements Identifiable
     public function variables(): HasMany
     {
         return $this->hasMany(EggVariable::class, 'egg_id')->orderBy('id');
+    }
+
+    /**
+     * Gets all startup parts associated with this egg.
+     *
+     * @return HasMany<EggStartupPart, $this>
+     */
+    public function startupParts(): HasMany
+    {
+        return $this->hasMany(EggStartupPart::class, 'egg_id')->orderBy('sort_order');
     }
 
     /**

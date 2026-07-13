@@ -7,10 +7,12 @@ use App\Exceptions\Repository\RecordNotFoundException;
 use App\Facades\Activity;
 use App\Http\Controllers\Api\Client\ClientApiController;
 use App\Http\Requests\Api\Client\Servers\Startup\GetStartupRequest;
+use App\Http\Requests\Api\Client\Servers\Startup\UpdateStartupPartsRequest;
 use App\Http\Requests\Api\Client\Servers\Startup\UpdateStartupVariableRequest;
 use App\Models\Server;
 use App\Repositories\Eloquent\ServerVariableRepository;
 use App\Services\Servers\StartupCommandService;
+use App\Transformers\Api\Client\EggStartupPartTransformer;
 use App\Transformers\Api\Client\EggVariableTransformer;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -34,16 +36,38 @@ class StartupController extends ClientApiController
     {
         $startup = $this->startupCommandService->handle($server);
 
-        return $this->fractal->collection(
+        $variables = $this->fractal->collection(
             $server->variables()->where('user_viewable', true)->get()
         )
             ->transformWith($this->getTransformer(EggVariableTransformer::class))
-            ->addMeta([
+            ->toArray();
+
+        $parts = $this->fractal->collection(
+            $server->egg->startupParts
+        )
+            ->transformWith($this->getTransformer(EggStartupPartTransformer::class))
+            ->toArray();
+
+        // Merge user's saved choices into parts
+        $userChoices = $server->startup_parts ?? [];
+        $partsData = collect($parts['data'] ?? [])->map(function ($part) use ($userChoices) {
+            $attrs = $part['attributes'] ?? $part;
+            $choice = collect($userChoices)->firstWhere('part_id', $attrs['id']);
+            $attrs['user_enabled'] = $choice['enabled'] ?? $attrs['default_enabled'];
+
+            return $attrs;
+        })->toArray();
+
+        return [
+            'data' => $variables['data'] ?? [],
+            'meta' => [
                 'startup_command' => $startup,
                 'docker_images' => $server->egg->docker_images,
                 'raw_startup_command' => $server->startup,
-            ])
-            ->toArray();
+                'startup_parts' => $partsData,
+                'has_modular_startup' => $server->egg->startupParts->isNotEmpty(),
+            ],
+        ];
     }
 
     /**
@@ -98,5 +122,60 @@ class StartupController extends ClientApiController
                 'raw_startup_command' => $server->startup,
             ])
             ->toArray();
+    }
+
+    /**
+     * Updates the startup parts configuration for a server.
+     *
+     * @throws ValidationException
+     */
+    public function updateParts(UpdateStartupPartsRequest $request, Server $server): array
+    {
+        $eggParts = $server->egg->startupParts;
+        $requestedParts = $request->input('parts', []);
+
+        // Validate that all part IDs belong to this server's egg
+        $validPartIds = $eggParts->pluck('id')->toArray();
+        foreach ($requestedParts as $part) {
+            if (! in_array($part['part_id'], $validPartIds)) {
+                throw new BadRequestHttpException('Invalid startup part ID: '.$part['part_id']);
+            }
+        }
+
+        // Validate required parts can't be disabled
+        foreach ($eggParts->where('required', true) as $requiredPart) {
+            $choice = collect($requestedParts)->firstWhere('part_id', $requiredPart->id);
+            if ($choice && ! $choice['enabled']) {
+                throw new BadRequestHttpException("The startup part '{$requiredPart->name}' is required and cannot be disabled.");
+            }
+        }
+
+        // Build the parts array preserving order from request
+        $partsData = collect($requestedParts)->map(function ($part) {
+            return [
+                'part_id' => $part['part_id'],
+                'enabled' => $part['enabled'],
+            ];
+        })->values()->toArray();
+
+        $server->update(['startup_parts' => $partsData]);
+
+        $startup = $this->startupCommandService->handle($server);
+
+        Activity::event('server:startup.edit')
+            ->subject($server)
+            ->property([
+                'variable' => 'startup_parts',
+                'old' => 'updated',
+                'new' => json_encode($partsData),
+            ])
+            ->log();
+
+        return [
+            'meta' => [
+                'startup_command' => $startup,
+                'raw_startup_command' => $server->startup,
+            ],
+        ];
     }
 }

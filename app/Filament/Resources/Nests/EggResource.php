@@ -202,6 +202,39 @@ class EggResource extends Resource
                                     }),
                             ]),
 
+                        Tab::make('startup_parts')
+                            ->label('Startup Parts')
+                            ->icon('tabler-puzzle')
+                            ->schema([
+                                Forms\Components\Repeater::make('startupParts')
+                                    ->relationship()
+                                    ->schema([
+                                        Forms\Components\TextInput::make('name')
+                                            ->required()
+                                            ->maxLength(191),
+                                        Forms\Components\TextInput::make('value')
+                                            ->required()
+                                            ->maxLength(191),
+                                        Forms\Components\Textarea::make('description')
+                                            ->maxLength(500)
+                                            ->columnSpanFull(),
+                                        Forms\Components\TextInput::make('group_name')
+                                            ->maxLength(191),
+                                        Forms\Components\Toggle::make('default_enabled')
+                                            ->label('Enabled by default'),
+                                        Forms\Components\Toggle::make('required')
+                                            ->label('Required (cannot be disabled)'),
+                                        Forms\Components\TextInput::make('sort_order')
+                                            ->numeric()
+                                            ->default(0),
+                                    ])
+                                    ->columns(2)
+                                    ->defaultItems(0)
+                                    ->reorderableWithButtons()
+                                    ->collapsible()
+                                    ->itemLabel(fn (array $state): ?string => $state['name'] ?? null),
+                            ]),
+
                         Tab::make('install_script')
                             ->label(trans('admin/eggs.sections.install_script.title'))
                             ->icon('tabler-file-code')
