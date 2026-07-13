@@ -88,6 +88,8 @@ return [
         'fetch_zones_failed' => 'Failed to fetch zones',
         'no_zones_found' => 'No active zones found for this API token.',
         'test_missing_token' => 'Please enter a Cloudflare API token first.',
+        'validation_error' => 'Cannot save',
+        'validation_missing' => 'Please fill in the following fields',
         'test_title' => 'Test Connection',
         'test_btn' => 'Test Cloudflare Connection',
         'test_success' => 'Cloudflare connection successful',

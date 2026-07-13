@@ -636,7 +636,6 @@ class Settings extends Page implements HasSchemas
                         ->helperText(trans('admin/settings.subdomains.api_token_helper'))
                         ->password()
                         ->revealable()
-                        ->required(fn ($get) => $get('subdomains:enabled'))
                         ->visible(fn ($get) => $get('subdomains:enabled'))
                         ->live(onBlur: true)
                         ->columnSpan(3),
@@ -654,7 +653,6 @@ class Settings extends Page implements HasSchemas
                         ->helperText(trans('admin/settings.subdomains.zone_id_helper'))
                         ->options(fn () => $this->zoneOptions)
                         ->searchable()
-                        ->required(fn ($get) => $get('subdomains:enabled'))
                         ->visible(fn ($get) => $get('subdomains:enabled'))
                         ->live()
                         ->afterStateUpdated(function (Set $set, mixed $state): void {
@@ -670,7 +668,6 @@ class Settings extends Page implements HasSchemas
                         ->label(trans('admin/settings.subdomains.base_domain'))
                         ->placeholder('srv.example.com')
                         ->helperText(trans('admin/settings.subdomains.base_domain_helper'))
-                        ->required(fn ($get) => $get('subdomains:enabled'))
                         ->visible(fn ($get) => $get('subdomains:enabled'))
                         ->columnSpan(2),
 
@@ -681,7 +678,6 @@ class Settings extends Page implements HasSchemas
                         ->default(1)
                         ->minValue(0)
                         ->maxValue(100)
-                        ->required(fn ($get) => $get('subdomains:enabled'))
                         ->visible(fn ($get) => $get('subdomains:enabled'))
                         ->columnSpan(4),
                 ]),
@@ -713,6 +709,11 @@ class Settings extends Page implements HasSchemas
         $encrypter = app(Encrypter::class);
         $form = $this->getForm('form');
         $data = $form?->getState() ?? [];
+
+        // Validate subdomain fields when enabled (since we removed required() from form fields)
+        if (! empty($data['subdomains:enabled'])) {
+            $this->validateSubdomainFields($data);
+        }
 
         foreach ($data as $key => $value) {
             if ($key === 'mail:mailers:smtp:password' && ! empty($value)) {
@@ -747,6 +748,32 @@ class Settings extends Page implements HasSchemas
             ->send();
 
         $this->dispatch('$refresh');
+    }
+
+    private function validateSubdomainFields(array $data): void
+    {
+        $missing = [];
+
+        if (empty($data['subdomains:cloudflare_api_token'])) {
+            $missing[] = trans('admin/settings.subdomains.api_token');
+        }
+        if (empty($data['subdomains:cloudflare_zone_id'])) {
+            $missing[] = trans('admin/settings.subdomains.zone_id');
+        }
+        if (empty($data['subdomains:base_domain'])) {
+            $missing[] = trans('admin/settings.subdomains.base_domain');
+        }
+
+        if (! empty($missing)) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.validation_error'))
+                ->body(sprintf('%s: %s', trans('admin/settings.subdomains.validation_missing'), implode(', ', $missing)))
+                ->danger()
+                ->send();
+
+            // Halt save by throwing
+            throw new \RuntimeException('Missing required subdomain fields.');
+        }
     }
 
     public function testMail(): void
