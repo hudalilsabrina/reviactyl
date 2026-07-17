@@ -5,6 +5,7 @@ import RenameServerBox from '@/components/server/settings/RenameServerBox';
 import FlashMessageRender from '@/components/FlashMessageRender';
 import Can from '@/reviactyl/elements/Can';
 import ReinstallServerBox from '@/components/server/settings/ReinstallServerBox';
+import SubdomainBox from '@/components/server/settings/SubdomainBox';
 import tw from 'twin.macro';
 import Input from '@/reviactyl/elements/Input';
 import Label from '@/reviactyl/elements/Label';
@@ -82,6 +83,11 @@ export default () => {
                     </TitledGreyBox>
                 </div>
                 <div css={tw`w-full mt-6 md:flex-1 md:mt-0`}>
+                    <Can action={'settings.subdomain'}>
+                        <div css={tw`mb-6 md:mb-10`}>
+                            <SubdomainBox />
+                        </div>
+                    </Can>
                     <Can action={'settings.rename'}>
                         <div css={tw`mb-6 md:mb-10`}>
                             <RenameServerBox />

@@ -73,6 +73,59 @@ return [
         'ending-label' => 'Ending Port',
         'save-btn' => 'Save',
     ],
+    'subdomains' => [
+        'title' => 'Subdomains',
+        'cloudflare' => 'Cloudflare DNS',
+        'enabled' => 'Enable Subdomains',
+        'base_domain' => 'Base Domain',
+        'base_domain_helper' => 'Auto-filled when zones are selected. Used for auto-generated subdomains.',
+        'base_domains' => 'Base Domains',
+        'base_domains_helper' => 'Comma-separated list of domains available for subdomains. Auto-filled from selected zones.',
+        'zone_id' => 'Cloudflare Zone',
+        'zone_id_helper' => 'Select the zone that manages your subdomain DNS.',
+        'zone_ids' => 'Cloudflare Zones',
+        'zone_ids_helper' => 'Select one or more zones. Each zone\'s domain becomes available for subdomains.',
+        'api_token' => 'Cloudflare API Token',
+        'api_token_helper' => 'Create a token with Zone:DNS:Edit and Zone:Zone:Read permissions. Zones are loaded automatically when you paste the token. Stored encrypted.',
+        'fetch_zones_success' => 'Zones loaded successfully',
+        'fetch_zones_failed' => 'Failed to fetch zones',
+        'no_zones_found' => 'No active zones found for this API token.',
+        'test_missing_token' => 'Please enter a Cloudflare API token first.',
+        'validation_error' => 'Cannot save',
+        'validation_missing' => 'Please fill in the following fields',
+        'test_title' => 'Test Connection',
+        'test_btn' => 'Test Cloudflare Connection',
+        'test_success' => 'Cloudflare connection successful',
+        'test_failed' => 'Cloudflare connection failed',
+        'test_missing_fields' => 'Please fill in the API token and Zone ID first.',
+        'max_per_server' => 'Max Subdomains Per Server',
+        'max_per_server_helper' => 'Maximum number of subdomains a server can have. Set to 0 for unlimited.',
+        'setup_guide' => 'Setup Guide',
+        'setup_guide_content' => <<<'EOT'
+<h3>Quick Setup</h3>
+<p><strong>Step 1 — Create a Cloudflare API Token</strong></p>
+<ol>
+<li>Go to <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="color: #60a5fa; text-decoration: underline;">Cloudflare Dashboard → API Tokens</a></li>
+<li>Click <strong>Create Token</strong></li>
+<li>Use the <strong>Edit zone DNS</strong> template (or create custom)</li>
+<li>Under <strong>Zone Resources</strong>, select <strong>Include → Specific zone → your domain</strong></li>
+<li>Click <strong>Continue to summary</strong> → <strong>Create Token</strong></li>
+<li>Copy the token (you won't see it again)</li>
+</ol>
+<p><strong>Step 2 — Configure This Panel</strong></p>
+<ol>
+<li>Paste the API token in the field below</li>
+<li>Click <strong>Fetch Zones</strong> to load your domains</li>
+<li>Select your zone from the dropdown</li>
+<li>The base domain auto-fills — edit it to add a prefix (e.g., <code>srv.example.com</code>)</li>
+<li>Set max subdomains per server (0 = unlimited)</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<p><strong>Step 3 — Done!</strong></p>
+<p>New servers will auto-get a subdomain like <code>my-server.srv.example.com</code>. Users can customize it from their server settings page.</p>
+<p><em>Note: The API token needs <strong>Zone:Zone:Read</strong> and <strong>Zone:DNS:Edit</strong> permissions.</em></p>
+EOT,
+    ],
     'social' => [
         'title' => 'Social Login',
         'subtitle' => 'Configure social login providers.',

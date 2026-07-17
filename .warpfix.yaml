@@ -1,0 +1,30 @@
+version: 1
+
+repair:
+  auto_fix: true
+  confidence_threshold: 0.75
+  max_retries: 2
+  sandbox_timeout: 300
+
+quality_gates:
+  min_confidence: 0.8
+  require_tests: true
+  max_patch_lines: 50
+  block_on_security: true
+
+review:
+  auto_comment: true
+  severity_labels: true
+  mermaid_diagrams: true
+  effort_estimates: true
+
+ignore:
+  paths:
+    - "node_modules/**"
+    - "public/build/**"
+    - "vendor/**"
+    - "*.lock"
+    - "dist/**"
+  errors:
+    - "ECONNRESET"
+    - "rate limit"

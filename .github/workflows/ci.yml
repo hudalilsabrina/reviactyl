@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend:
+    name: Backend (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, gd, bcmath, intl, posix, fileinfo
+          coverage: none
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          sed -i 's|^#DB_DATABASE=panel|DB_DATABASE=${{ github.workspace }}/database/database.sqlite|' .env
+          sed -i 's|QUEUE_CONNECTION=redis|QUEUE_CONNECTION=sync|' .env
+          touch database/database.sqlite
+          mkdir -p storage/framework/{sessions,views,cache,testing}
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ matrix.php }}-
+
+      - name: Install Composer Dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Post-Install Setup
+        run: |
+          composer run-script post-autoload-dump || true
+          php artisan key:generate
+          php artisan migrate --force
+
+      - name: Check PHP Formatting (Pint)
+        run: ./vendor/bin/pint --test -v
+
+      - name: Static Analysis (PHPStan)
+        run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@11
+
+      - name: Get pnpm Store Directory
+        id: pnpm-cache
+        run: echo "dir=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.dir }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (ESLint)
+        run: pnpm run lint
+
+      - name: Type Check (TSC)
+        run: pnpm run tsc
+
+      - name: Build
+        run: pnpm run build

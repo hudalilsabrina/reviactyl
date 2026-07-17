@@ -7,6 +7,7 @@ use App\Filament\Components\ImageInput;
 use App\Notifications\MailTested;
 use App\Traits\Helpers\AvailableLanguages;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -20,11 +21,14 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Mail\MailManager;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class Settings extends Page implements HasSchemas
@@ -40,6 +44,8 @@ class Settings extends Page implements HasSchemas
     protected string $view = 'filament.pages.settings';
 
     public ?array $data = [];
+
+    public array $zoneOptions = [];
 
     protected array $settingKeys = [
         'app:name',
@@ -84,6 +90,12 @@ class Settings extends Page implements HasSchemas
         'panel:client_features:allocations:enabled',
         'panel:client_features:allocations:range_start',
         'panel:client_features:allocations:range_end',
+
+        'subdomains:enabled',
+        'subdomains:cloudflare_api_token',
+        'subdomains:cloudflare_zone_ids',
+        'subdomains:base_domains',
+        'subdomains:max_per_server',
     ];
 
     public function getHeading(): string
@@ -124,6 +136,13 @@ class Settings extends Page implements HasSchemas
                 }
             }
 
+            if ($key === 'subdomains:cloudflare_api_token' && ! empty($value)) {
+                try {
+                    $value = $encrypter->decrypt($value);
+                } catch (\Throwable) {
+                }
+            }
+
             if ($value === 'true') {
                 $value = true;
             }
@@ -138,10 +157,51 @@ class Settings extends Page implements HasSchemas
             $formData[$key] = $value;
         }
 
+        // Decode JSON array fields for multi-select components
+        foreach (['subdomains:cloudflare_zone_ids'] as $jsonKey) {
+            if (isset($formData[$jsonKey]) && is_string($formData[$jsonKey])) {
+                $decoded = json_decode($formData[$jsonKey], true);
+                if (is_array($decoded)) {
+                    $formData[$jsonKey] = $decoded;
+                }
+            }
+        }
+
         $form = $this->getForm('form');
 
         if ($form !== null) {
             $form->fill($formData);
+        }
+
+        // Populate zone options from saved zone IDs so the Select shows the saved values
+        $savedZoneIds = $formData['subdomains:cloudflare_zone_ids'] ?? null;
+        $apiToken = $formData['subdomains:cloudflare_api_token'] ?? null;
+
+        if (! empty($savedZoneIds) && ! empty($apiToken)) {
+            // Handle both JSON array and comma-separated formats
+            if (is_string($savedZoneIds)) {
+                $zoneIds = str_starts_with($savedZoneIds, '[')
+                    ? json_decode($savedZoneIds, true)
+                    : array_map('trim', explode(',', $savedZoneIds));
+            } else {
+                $zoneIds = (array) $savedZoneIds;
+            }
+
+            try {
+                $response = Http::timeout(10)->withHeaders([
+                    'Authorization' => 'Bearer '.$apiToken,
+                ])->get('https://api.cloudflare.com/client/v4/zones', [
+                    'per_page' => 50,
+                    'status' => 'active',
+                ]);
+
+                if ($response->successful() && $response->json('success')) {
+                    $this->zoneOptions = collect($response->json('result', []))
+                        ->mapWithKeys(fn ($zone) => [$zone['id'] => $zone['name']])
+                        ->all();
+                }
+            } catch (\Throwable) {
+            }
         }
     }
 
@@ -175,6 +235,11 @@ class Settings extends Page implements HasSchemas
                         ->label(trans('admin/settings.advanced.title'))
                         ->icon('tabler-adjustments')
                         ->schema($this->advancedSettings()),
+
+                    Tab::make('subdomains')
+                        ->label(trans('admin/settings.subdomains.title'))
+                        ->icon('tabler-link')
+                        ->schema($this->subdomainSettings()),
                 ]),
         ];
     }
@@ -564,6 +629,102 @@ class Settings extends Page implements HasSchemas
         ];
     }
 
+    private function subdomainSettings(): array
+    {
+        return [
+            Section::make(trans('admin/settings.subdomains.setup_guide'))
+                ->icon('tabler-info-circle')
+                ->collapsible()
+                ->collapsed()
+                ->columnSpanFull()
+                ->schema([
+                    Placeholder::make('setup_guide_content')
+                        ->content(new HtmlString(trans('admin/settings.subdomains.setup_guide_content')))
+                        ->columnSpanFull(),
+                ]),
+
+            Section::make(trans('admin/settings.subdomains.cloudflare'))
+                ->columns(4)
+                ->icon('tabler-brand-cloudflare')
+                ->schema([
+                    Toggle::make('subdomains:enabled')
+                        ->label(trans('admin/settings.subdomains.enabled'))
+                        ->inline(false)
+                        ->onIcon('tabler-check')
+                        ->offIcon('tabler-x')
+                        ->onColor('success')
+                        ->offColor('danger')
+                        ->live()
+                        ->columnSpan(4),
+
+                    TextInput::make('subdomains:cloudflare_api_token')
+                        ->label(trans('admin/settings.subdomains.api_token'))
+                        ->helperText(trans('admin/settings.subdomains.api_token_helper'))
+                        ->password()
+                        ->revealable()
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(function (Set $set, mixed $state): void {
+                            if (filled($state)) {
+                                $this->fetchZonesFromToken($state, $set);
+                            }
+                        })
+                        ->columnSpan(4),
+
+                    Select::make('subdomains:cloudflare_zone_ids')
+                        ->label(trans('admin/settings.subdomains.zone_ids'))
+                        ->helperText(trans('admin/settings.subdomains.zone_ids_helper'))
+                        ->options(fn () => $this->zoneOptions)
+                        ->searchable()
+                        ->multiple()
+                        ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_api_token')))
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, mixed $state): void {
+                            // Auto-fill base domains from selected zone names
+                            $domains = [];
+                            foreach ((array) $state as $zoneId) {
+                                if (isset($this->zoneOptions[$zoneId])) {
+                                    $domains[] = $this->zoneOptions[$zoneId];
+                                }
+                            }
+                            $set('subdomains:base_domains', implode(',', $domains));
+                        })
+                        ->native(false)
+                        ->columnSpan(4),
+
+                    TextInput::make('subdomains:base_domains')
+                        ->label(trans('admin/settings.subdomains.base_domains'))
+                        ->placeholder('example.com, example.org')
+                        ->helperText(trans('admin/settings.subdomains.base_domains_helper'))
+                        ->visible(fn ($get) => $get('subdomains:enabled') && filled($get('subdomains:cloudflare_zone_ids')))
+                        ->columnSpan(4),
+
+                    TextInput::make('subdomains:max_per_server')
+                        ->label(trans('admin/settings.subdomains.max_per_server'))
+                        ->helperText(trans('admin/settings.subdomains.max_per_server_helper'))
+                        ->numeric()
+                        ->default(1)
+                        ->minValue(0)
+                        ->maxValue(100)
+                        ->visible(fn ($get) => $get('subdomains:enabled'))
+                        ->columnSpan(4),
+                ]),
+
+            Section::make(trans('admin/settings.subdomains.test_title'))
+                ->columns(4)
+                ->visible(fn ($get) => $get('subdomains:enabled'))
+                ->schema([
+                    Actions::make([
+                        Action::make('test_cloudflare')
+                            ->label(trans('admin/settings.subdomains.test_btn'))
+                            ->icon('tabler-brand-cloudflare')
+                            ->action('testCloudflare')
+                            ->color('success'),
+                    ])->fullWidth(),
+                ]),
+        ];
+    }
+
     protected function getFormStatePath(): ?string
     {
         return 'data';
@@ -577,13 +738,30 @@ class Settings extends Page implements HasSchemas
         $form = $this->getForm('form');
         $data = $form?->getState() ?? [];
 
+        // Validate subdomain fields when enabled (since we removed required() from form fields)
+        if (! empty($data['subdomains:enabled'])) {
+            $this->validateSubdomainFields($data);
+        }
+
         foreach ($data as $key => $value) {
             if ($key === 'mail:mailers:smtp:password' && ! empty($value)) {
                 $value = $encrypter->encrypt($value);
             }
+            // Only encrypt if value is not already encrypted (e.g. mount failed to decrypt)
+            if ($key === 'subdomains:cloudflare_api_token' && ! empty($value)) {
+                $alreadyEncrypted = true;
+                try {
+                    $encrypter->decrypt($value);
+                } catch (\Throwable) {
+                    $alreadyEncrypted = false;
+                }
+                if (! $alreadyEncrypted) {
+                    $value = $encrypter->encrypt($value);
+                }
+            }
             $settings->set(
                 'settings::'.$key,
-                is_bool($value) ? ($value ? 'true' : 'false') : $value
+                is_bool($value) ? ($value ? 'true' : 'false') : (is_array($value) ? json_encode($value) : $value)
             );
         }
 
@@ -598,6 +776,31 @@ class Settings extends Page implements HasSchemas
             ->send();
 
         $this->dispatch('$refresh');
+    }
+
+    private function validateSubdomainFields(array $data): void
+    {
+        $missing = [];
+
+        if (empty($data['subdomains:cloudflare_api_token'])) {
+            $missing[] = trans('admin/settings.subdomains.api_token');
+        }
+        if (empty($data['subdomains:cloudflare_zone_ids'])) {
+            $missing[] = trans('admin/settings.subdomains.zone_ids');
+        }
+        if (empty($data['subdomains:base_domains'])) {
+            $missing[] = trans('admin/settings.subdomains.base_domains');
+        }
+
+        if (! empty($missing)) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.validation_error'))
+                ->body(sprintf('%s: %s', trans('admin/settings.subdomains.validation_missing'), implode(', ', $missing)))
+                ->danger()
+                ->send();
+
+            throw new \RuntimeException('Missing required subdomain fields.');
+        }
     }
 
     public function testMail(): void
@@ -630,6 +833,139 @@ class Settings extends Page implements HasSchemas
         } catch (\Exception $exception) {
             Notification::make()
                 ->title(trans('admin/settings.mail.test-failed'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function testCloudflare(): void
+    {
+        $form = $this->getForm('form');
+        $data = $form?->getState() ?? [];
+
+        $apiToken = $data['subdomains:cloudflare_api_token'] ?? null;
+        $zoneId = $data['subdomains:cloudflare_zone_id'] ?? null;
+
+        if (empty($apiToken) || empty($zoneId)) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.test_failed'))
+                ->body(trans('admin/settings.subdomains.test_missing_fields'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$apiToken,
+            ])->get("https://api.cloudflare.com/client/v4/zones/{$zoneId}");
+
+            if ($response->successful() && $response->json('success')) {
+                $zoneName = $response->json('result.name', 'Unknown');
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.test_success'))
+                    ->body(sprintf('Zone: %s', $zoneName))
+                    ->success()
+                    ->send();
+            } else {
+                $error = collect($response->json('errors', []))->pluck('message')->join(', ');
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.test_failed'))
+                    ->body($error ?: 'Unknown error')
+                    ->danger()
+                    ->send();
+            }
+        } catch (\Exception $exception) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.test_failed'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function fetchZones(): void
+    {
+        $form = $this->getForm('form');
+        $data = $form?->getState() ?? [];
+        $apiToken = $data['subdomains:cloudflare_api_token'] ?? null;
+
+        if (empty($apiToken)) {
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
+                ->body(trans('admin/settings.subdomains.test_missing_token'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->fetchZonesFromToken($apiToken);
+    }
+
+    /**
+     * Fetch Cloudflare zones from an API token and populate the zone dropdown.
+     */
+    private function fetchZonesFromToken(string $apiToken, ?Set $set = null): void
+    {
+        try {
+            $response = Http::timeout(10)->withHeaders([
+                'Authorization' => 'Bearer '.$apiToken,
+            ])->get('https://api.cloudflare.com/client/v4/zones', [
+                'per_page' => 50,
+                'status' => 'active',
+            ]);
+
+            if ($response->successful() && $response->json('success')) {
+                $zones = collect($response->json('result', []))
+                    ->mapWithKeys(fn ($zone) => [$zone['id'] => $zone['name']])
+                    ->all();
+
+                if (empty($zones)) {
+                    $this->zoneOptions = [];
+
+                    Notification::make()
+                        ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
+                        ->body(trans('admin/settings.subdomains.no_zones_found'))
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                $this->zoneOptions = $zones;
+
+                // Auto-select if only one zone
+                if (count($zones) === 1 && $set) {
+                    $zoneId = array_key_first($zones);
+                    $set('subdomains:cloudflare_zone_id', $zoneId);
+                    $set('subdomains:base_domain', $zones[$zoneId]);
+                }
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.fetch_zones_success'))
+                    ->body(sprintf('Found %d zone(s)', count($zones)))
+                    ->success()
+                    ->send();
+            } else {
+                $this->zoneOptions = [];
+                $error = collect($response->json('errors', []))->pluck('message')->join(', ');
+
+                Notification::make()
+                    ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
+                    ->body($error ?: 'Unknown error')
+                    ->danger()
+                    ->send();
+            }
+        } catch (\Exception $exception) {
+            $this->zoneOptions = [];
+
+            Notification::make()
+                ->title(trans('admin/settings.subdomains.fetch_zones_failed'))
                 ->body($exception->getMessage())
                 ->danger()
                 ->send();

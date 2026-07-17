@@ -216,6 +216,7 @@ class SettingsServiceProvider extends ServiceProvider
         'panel:auth:google_client_secret',
         'panel:auth:discord_client_secret',
         'panel:auth:github_client_secret',
+        'subdomains:cloudflare_api_token',
     ];
 
     /**

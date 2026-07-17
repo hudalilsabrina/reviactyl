@@ -7,6 +7,7 @@ use App\Exceptions\Http\Connection\DaemonConnectionException;
 use App\Models\Server;
 use App\Repositories\Agent\DaemonServerRepository;
 use App\Services\Databases\DatabaseManagementService;
+use App\Services\Subdomains\SubdomainService;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +23,7 @@ class ServerDeletionService
         private ConnectionInterface $connection,
         private DaemonServerRepository $daemonServerRepository,
         private DatabaseManagementService $databaseManagementService,
+        private SubdomainService $subdomainService,
     ) {}
 
     /**
@@ -55,6 +57,10 @@ class ServerDeletionService
 
             Log::warning($exception);
         }
+
+        // Clean up Cloudflare DNS records OUTSIDE the transaction to avoid
+        // orphaned records if the transaction rolls back.
+        $this->subdomainService->deleteAllForServer($server);
 
         $this->connection->transaction(function () use ($server) {
             foreach ($server->databases as $database) {
