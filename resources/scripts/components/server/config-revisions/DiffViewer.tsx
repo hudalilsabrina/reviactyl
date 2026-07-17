@@ -15,7 +15,7 @@ const DiffViewer = ({ diff, loading }: Props) => {
         );
     }
 
-    const files = Object.entries(diff.files);
+    const files = Object.entries(diff.files ?? {});
 
     if (files.length === 0) {
         return <p css={tw`text-center text-sm text-gray-400 py-4`}>No differences found.</p>;

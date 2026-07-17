@@ -51,7 +51,7 @@ const RevisionRow = ({ revision, isSelected, onViewDiff, onRevert, onPromote }: 
                         <span>{new Date(revision.created_at).toLocaleString()}</span>
                     </div>
 
-                    {revision.files.length > 0 && (
+                    {revision.files && revision.files.length > 0 && (
                         <div css={tw`mt-2 flex flex-wrap gap-1`}>
                             {revision.files.map((file) => (
                                 <code
