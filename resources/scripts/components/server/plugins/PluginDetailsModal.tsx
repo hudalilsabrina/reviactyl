@@ -107,9 +107,12 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                 <div className='min-w-0 flex-1'>
                     <h2 className='text-lg sm:text-xl font-semibold text-gray-100 break-words'>{plugin.name}</h2>
                     {details?.author && <p className='text-sm text-gray-400 truncate'>{details.author}</p>}
-                    <div className='flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-gray-500'>
+                    <div className='flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500'>
                         {details?.downloads !== null && details?.downloads !== undefined && (
-                            <span className='inline-flex items-center gap-1' title={details.downloads.toLocaleString()}>
+                            <span
+                                className='inline-flex items-center gap-1.5 font-mono'
+                                title={details.downloads.toLocaleString()}
+                            >
                                 <FaDownload /> {formatCount(details.downloads)}
                             </span>
                         )}
@@ -118,9 +121,9 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                                 href={details.url}
                                 target='_blank'
                                 rel='noreferrer'
-                                className='inline-flex items-center gap-1 text-primary-400 hover:text-primary-300'
+                                className='inline-flex items-center gap-1.5 text-primary-400 hover:text-primary-300 hover:underline underline-offset-2'
                             >
-                                <FaExternalLinkAlt /> {t('view-on-provider')}
+                                <FaExternalLinkAlt className='w-3 h-3' /> {t('view-on-provider')}
                             </a>
                         )}
                     </div>
@@ -145,7 +148,11 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                     {versions.length === 0 ? (
                         <Spinner size='small' />
                     ) : (
-                        <Select value={selectedVersion} onChange={(e) => setSelectedVersion(e.target.value)}>
+                        <Select
+                            value={selectedVersion}
+                            onChange={(e) => setSelectedVersion(e.target.value)}
+                            className='font-mono text-sm'
+                        >
                             {versions.map((v) => {
                                 const supported = formatGameVersions(v.game_versions);
 
