@@ -220,7 +220,7 @@ class PluginProviderService
             'id' => $r['id'],
             'slug' => null,
             'name' => $r['name'] ?? '',
-            'author' => Arr::get($r, 'author.id') ? 'ID '.Arr::get($r, 'author.id') : null,
+            'author' => null, // Search only returns the author ID; the name is loaded in the details view.
             'description' => $r['tag'] ?? null,
             'downloads' => $r['downloads'] ?? null,
             'icon' => isset($r['icon']['url']) ? 'https://www.spigotmc.org/'.$r['icon']['url'] : null,
@@ -236,14 +236,20 @@ class PluginProviderService
         }
 
         $data = $response->json();
+        $author = Http::acceptJson()
+            ->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/author')
+            ->json('name');
+
+        // Descriptions are base64-encoded HTML; strip tags for plain-text display.
+        $body = isset($data['description']) ? base64_decode((string) $data['description'], true) : false;
 
         return [
             'id' => $data['id'] ?? $id,
             'slug' => null,
             'name' => $data['name'] ?? '',
-            'author' => Arr::get($data, 'author.id') ? 'ID '.Arr::get($data, 'author.id') : null,
+            'author' => $author,
             'description' => $data['tag'] ?? null,
-            'body' => null,
+            'body' => $body !== false ? trim(preg_replace('/\s+/', ' ', strip_tags($body)) ?? '') ?: null : null,
             'downloads' => $data['downloads'] ?? null,
             'icon' => isset($data['icon']['url']) ? 'https://www.spigotmc.org/'.$data['icon']['url'] : null,
             'url' => isset($data['id']) ? 'https://www.spigotmc.org/resources/'.$data['id'] : null,
