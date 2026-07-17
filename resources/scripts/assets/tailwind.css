@@ -1,3 +1,61 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Rich plugin descriptions (sanitized provider markup). */
+.plugin-body h1,
+.plugin-body h2,
+.plugin-body h3,
+.plugin-body h4 {
+    @apply text-gray-100 font-semibold mt-4 mb-2;
+}
+.plugin-body h1 {
+    @apply text-lg;
+}
+.plugin-body h2 {
+    @apply text-base;
+}
+.plugin-body h3,
+.plugin-body h4 {
+    @apply text-sm;
+}
+.plugin-body p {
+    @apply my-2 leading-relaxed;
+}
+.plugin-body a {
+    @apply text-primary-400 hover:text-primary-300 underline break-all;
+}
+.plugin-body ul {
+    @apply list-disc pl-5 my-2;
+}
+.plugin-body ol {
+    @apply list-decimal pl-5 my-2;
+}
+.plugin-body li {
+    @apply my-1;
+}
+.plugin-body img {
+    @apply max-w-full h-auto my-2 rounded-ui;
+}
+.plugin-body pre {
+    @apply bg-gray-950 rounded p-3 my-2 overflow-x-auto text-xs;
+}
+.plugin-body code {
+    @apply bg-gray-950 rounded px-1 py-0.5 text-xs;
+}
+.plugin-body pre code {
+    @apply bg-transparent p-0;
+}
+.plugin-body blockquote {
+    @apply border-l-2 border-gray-700 pl-3 my-2 text-gray-400;
+}
+.plugin-body hr {
+    @apply border-gray-800 my-4;
+}
+.plugin-body table {
+    @apply w-full text-left my-2;
+}
+.plugin-body th,
+.plugin-body td {
+    @apply border border-gray-800 px-2 py-1 text-xs;
+}
