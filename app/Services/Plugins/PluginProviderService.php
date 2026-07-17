@@ -16,6 +16,15 @@ class PluginProviderService
     public function __construct(private SettingsRepositoryInterface $settings) {}
 
     /**
+     * Provider API calls share one client so slow upstreams cannot hang a
+     * request worker (Laravel's Http client has no default timeout).
+     */
+    private function http(): PendingRequest
+    {
+        return Http::acceptJson()->timeout(10)->connectTimeout(5);
+    }
+
+    /**
      * Whether a provider can be used (CurseForge requires an admin-set API key).
      */
     public function isAvailable(string $provider): bool
@@ -114,13 +123,12 @@ class PluginProviderService
             $facets[] = ['versions:'.$mc];
         }
 
-        $response = Http::acceptJson()
-            ->get('https://api.modrinth.com/v2/search', [
-                'query' => $query,
-                'limit' => 20,
-                'offset' => $offset,
-                'facets' => json_encode($facets),
-            ])
+        $response = $this->http()->get('https://api.modrinth.com/v2/search', [
+            'query' => $query,
+            'limit' => 20,
+            'offset' => $offset,
+            'facets' => json_encode($facets),
+        ])
             ->throw();
 
         $results = array_map(fn ($hit) => [
@@ -138,7 +146,7 @@ class PluginProviderService
 
     private function detailsModrinth(string $id): ?array
     {
-        $hit = Http::acceptJson()->get('https://api.modrinth.com/v2/project/'.urlencode($id));
+        $hit = $this->http()->get('https://api.modrinth.com/v2/project/'.urlencode($id));
 
         if (! $hit->successful()) {
             return null;
@@ -167,8 +175,7 @@ class PluginProviderService
             $params['game_versions'] = json_encode([$mc]);
         }
 
-        $response = Http::acceptJson()
-            ->get('https://api.modrinth.com/v2/project/'.urlencode($id).'/version', $params);
+        $response = $this->http()->get('https://api.modrinth.com/v2/project/'.urlencode($id).'/version', $params);
 
         if (! $response->successful()) {
             return [];
@@ -188,7 +195,7 @@ class PluginProviderService
 
     private function resolveModrinth(string $id, string $versionId): ?array
     {
-        $response = Http::acceptJson()->get('https://api.modrinth.com/v2/version/'.urlencode($versionId));
+        $response = $this->http()->get('https://api.modrinth.com/v2/version/'.urlencode($versionId));
 
         if (! $response->successful()) {
             return null;
@@ -219,8 +226,7 @@ class PluginProviderService
         ];
 
         // The search endpoint 404s on an empty term; fall back to the resource listing.
-        $data = Http::acceptJson()
-            ->get($query === ''
+        $data = $this->http()->get($query === ''
                 ? 'https://api.spiget.org/v2/resources'
                 : 'https://api.spiget.org/v2/search/resources/'.urlencode($query), $params)
             ->throw()
@@ -242,15 +248,14 @@ class PluginProviderService
 
     private function detailsSpiget(string $id): ?array
     {
-        $response = Http::acceptJson()->get('https://api.spiget.org/v2/resources/'.urlencode($id));
+        $response = $this->http()->get('https://api.spiget.org/v2/resources/'.urlencode($id));
 
         if (! $response->successful()) {
             return null;
         }
 
         $data = $response->json();
-        $author = Http::acceptJson()
-            ->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/author')
+        $author = $this->http()->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/author')
             ->json('name');
 
         // Descriptions are base64-encoded HTML.
@@ -272,12 +277,11 @@ class PluginProviderService
 
     private function versionsSpiget(string $id): array
     {
-        $response = Http::acceptJson()
-            ->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/versions', [
-                'size' => 30,
-                'sort' => '-releaseDate',
-                'fields' => 'id,name,downloads,releaseDate',
-            ]);
+        $response = $this->http()->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/versions', [
+            'size' => 30,
+            'sort' => '-releaseDate',
+            'fields' => 'id,name,downloads,releaseDate',
+        ]);
 
         if (! $response->successful()) {
             return [];
@@ -298,7 +302,7 @@ class PluginProviderService
     private function resolveSpiget(string $id, string $versionId): ?array
     {
         // External/premium resources cannot be downloaded automatically.
-        $resource = Http::acceptJson()->get('https://api.spiget.org/v2/resources/'.urlencode($id))->json();
+        $resource = $this->http()->get('https://api.spiget.org/v2/resources/'.urlencode($id))->json();
 
         if (($resource['external'] ?? false) || ($resource['premium'] ?? false)) {
             return null;
@@ -323,7 +327,7 @@ class PluginProviderService
 
     private function curseforge(): PendingRequest
     {
-        return Http::acceptJson()->withHeaders(['x-api-key' => $this->curseforgeKey()]);
+        return $this->http()->withHeaders(['x-api-key' => $this->curseforgeKey()]);
     }
 
     private function searchCurseForge(string $query, Server $server, int $offset): array
@@ -450,12 +454,11 @@ class PluginProviderService
 
     private function searchHangar(string $query, Server $server, int $offset): array
     {
-        $response = Http::acceptJson()
-            ->get('https://hangar.papermc.io/api/v1/projects', [
-                'query' => $query,
-                'limit' => 20,
-                'offset' => $offset,
-            ])
+        $response = $this->http()->get('https://hangar.papermc.io/api/v1/projects', [
+            'query' => $query,
+            'limit' => 20,
+            'offset' => $offset,
+        ])
             ->throw();
 
         $results = array_map(fn ($p) => [
@@ -473,7 +476,7 @@ class PluginProviderService
 
     private function detailsHangar(string $id): ?array
     {
-        $response = Http::acceptJson()->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id));
+        $response = $this->http()->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id));
 
         if (! $response->successful()) {
             return null;
@@ -482,8 +485,7 @@ class PluginProviderService
         $data = $response->json();
 
         // The main page is markdown served as text/plain.
-        $page = Http::withHeaders(['Accept' => 'text/plain'])
-            ->get('https://hangar.papermc.io/api/v1/pages/main/'.urlencode($data['namespace']['owner'] ?? '').'/'.urlencode($data['namespace']['slug'] ?? $id));
+        $page = $this->http()->withHeaders(['Accept' => 'text/plain'])->get('https://hangar.papermc.io/api/v1/pages/main/'.urlencode($data['namespace']['owner'] ?? '').'/'.urlencode($data['namespace']['slug'] ?? $id));
         $markdown = $page->successful() ? trim($page->body()) : null;
 
         return [
@@ -502,8 +504,7 @@ class PluginProviderService
 
     private function versionsHangar(string $id, Server $server): array
     {
-        $response = Http::acceptJson()
-            ->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions', ['limit' => 30]);
+        $response = $this->http()->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions', ['limit' => 30]);
 
         if (! $response->successful()) {
             return [];
@@ -532,8 +533,7 @@ class PluginProviderService
 
     private function resolveHangar(string $id, string $versionId): ?array
     {
-        $response = Http::acceptJson()
-            ->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions/'.urlencode($versionId));
+        $response = $this->http()->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions/'.urlencode($versionId));
 
         if (! $response->successful()) {
             return null;

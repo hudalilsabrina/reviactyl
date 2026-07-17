@@ -31,6 +31,8 @@ class PluginInstallerController extends ClientApiController
      */
     public function search(Request $request, Server $server): JsonResponse
     {
+        $this->ensureCanRead($request, $server);
+
         $request->validate([
             'provider' => ['required', Rule::in(PluginProviderService::PROVIDERS)],
             'query' => 'nullable|string|max:100',
@@ -61,6 +63,7 @@ class PluginInstallerController extends ClientApiController
      */
     public function details(Request $request, Server $server, string $provider, string $plugin): JsonResponse
     {
+        $this->ensureCanRead($request, $server);
         $this->ensureAvailable($provider);
 
         $details = $this->providers->details($provider, $plugin);
@@ -76,6 +79,7 @@ class PluginInstallerController extends ClientApiController
      */
     public function versions(Request $request, Server $server, string $provider, string $plugin): JsonResponse
     {
+        $this->ensureCanRead($request, $server);
         $this->ensureAvailable($provider);
 
         return new JsonResponse([
@@ -108,6 +112,12 @@ class PluginInstallerController extends ClientApiController
             throw new BadRequestHttpException('This plugin version cannot be installed automatically. Please download it manually from the provider.');
         }
 
+        // Defense in depth: the daemon fetches this URL server-side, so only
+        // allow plain HTTPS downloads from provider-resolved URLs.
+        if (! str_starts_with($download['url'], 'https://')) {
+            throw new BadRequestHttpException('This plugin version cannot be installed automatically. Please download it manually from the provider.');
+        }
+
         $this->fileRepository->setServer($server)->pull($download['url'], '/plugins', [
             'filename' => $download['filename'],
             'foreground' => true,
@@ -118,6 +128,17 @@ class PluginInstallerController extends ClientApiController
             ->log();
 
         return new JsonResponse(['data' => ['filename' => $download['filename']]]);
+    }
+
+    /**
+     * Reading provider data requires file.read so subusers without file
+     * permissions cannot use the panel as a proxy to third-party APIs.
+     */
+    private function ensureCanRead(Request $request, Server $server): void
+    {
+        if (! $request->user()->can(Permission::ACTION_FILE_READ, $server)) {
+            throw new AccessDeniedHttpException();
+        }
     }
 
     private function ensureAvailable(string $provider): void
