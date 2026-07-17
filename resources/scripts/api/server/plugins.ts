@@ -14,6 +14,8 @@ export interface PluginSearchResult {
 
 export interface PluginDetails extends PluginSearchResult {
     body: string | null;
+    /** Raw provider markup (HTML or rendered markdown); sanitize before injecting into the DOM. */
+    body_html: string | null;
     url: string | null;
 }
 

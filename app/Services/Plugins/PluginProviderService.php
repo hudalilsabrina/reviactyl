@@ -7,6 +7,7 @@ use App\Models\Server;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class PluginProviderService
 {
@@ -41,7 +42,7 @@ class PluginProviderService
     /**
      * Get full project details. Returns null when not found.
      *
-     * @return array{id: string|int, slug: string|null, name: string, author: string|null, description: string|null, body: string|null, downloads: int|null, icon: string|null, url: string|null}|null
+     * @return array{id: string|int, slug: string|null, name: string, author: string|null, description: string|null, body: string|null, body_html: string|null, downloads: int|null, icon: string|null, url: string|null}|null
      */
     public function details(string $provider, string $id): ?array
     {
@@ -149,6 +150,7 @@ class PluginProviderService
             'author' => $data['team'] ?? null,
             'description' => $data['description'] ?? null,
             'body' => $data['body'] ?? null,
+            'body_html' => isset($data['body']) && $data['body'] !== '' ? Str::markdown($data['body']) : null,
             'downloads' => $data['downloads'] ?? null,
             'icon' => $data['icon_url'] ?? null,
             'url' => isset($data['slug']) ? 'https://modrinth.com/plugin/'.$data['slug'] : null,
@@ -240,8 +242,8 @@ class PluginProviderService
             ->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/author')
             ->json('name');
 
-        // Descriptions are base64-encoded HTML; strip tags for plain-text display.
-        $body = isset($data['description']) ? base64_decode((string) $data['description'], true) : false;
+        // Descriptions are base64-encoded HTML.
+        $html = isset($data['description']) ? base64_decode((string) $data['description'], true) : false;
 
         return [
             'id' => $data['id'] ?? $id,
@@ -249,7 +251,8 @@ class PluginProviderService
             'name' => $data['name'] ?? '',
             'author' => $author,
             'description' => $data['tag'] ?? null,
-            'body' => $body !== false ? trim(preg_replace('/\s+/', ' ', strip_tags($body)) ?? '') ?: null : null,
+            'body' => $html !== false ? trim(preg_replace('/\s+/', ' ', strip_tags($html)) ?? '') ?: null : null,
+            'body_html' => $html !== false && trim(strip_tags($html)) !== '' ? $html : null,
             'downloads' => $data['downloads'] ?? null,
             'icon' => isset($data['icon']['url']) ? 'https://www.spigotmc.org/'.$data['icon']['url'] : null,
             'url' => isset($data['id']) ? 'https://www.spigotmc.org/resources/'.$data['id'] : null,
@@ -353,13 +356,18 @@ class PluginProviderService
 
         $data = $response->json('data');
 
+        // The description endpoint returns HTML.
+        $body = $this->curseforge()->get('https://api.curseforge.com/v1/mods/'.urlencode($id).'/description');
+        $bodyHtml = $body->successful() ? trim((string) $body->json('data')) : null;
+
         return [
             'id' => $data['id'] ?? $id,
             'slug' => $data['slug'] ?? null,
             'name' => $data['name'] ?? '',
             'author' => Arr::get($data, 'authors.0.name'),
             'description' => $data['summary'] ?? null,
-            'body' => null,
+            'body' => $bodyHtml ? trim(preg_replace('/\s+/', ' ', strip_tags($bodyHtml)) ?? '') ?: null : null,
+            'body_html' => $bodyHtml ?: null,
             'downloads' => isset($data['downloadCount']) ? (int) $data['downloadCount'] : null,
             'icon' => Arr::get($data, 'logo.thumbnailUrl'),
             'url' => Arr::get($data, 'links.websiteUrl'),
@@ -460,13 +468,19 @@ class PluginProviderService
 
         $data = $response->json();
 
+        // The main page is markdown served as text/plain.
+        $page = Http::withHeaders(['Accept' => 'text/plain'])
+            ->get('https://hangar.papermc.io/api/v1/pages/main/'.urlencode($data['namespace']['owner'] ?? '').'/'.urlencode($data['namespace']['slug'] ?? $id));
+        $markdown = $page->successful() ? trim($page->body()) : null;
+
         return [
             'id' => $data['namespace']['slug'] ?? $id,
             'slug' => $data['namespace']['slug'] ?? null,
             'name' => $data['name'] ?? '',
             'author' => $data['namespace']['owner'] ?? null,
             'description' => $data['description'] ?? null,
-            'body' => null,
+            'body' => $markdown ? trim(preg_replace('/[#*_`>\[\]()!-]+/', ' ', strip_tags(Str::markdown($markdown))) ?? '') ?: null : null,
+            'body_html' => $markdown ? Str::markdown($markdown) : null,
             'downloads' => Arr::get($data, 'stats.downloads'),
             'icon' => $data['avatarUrl'] ?? null,
             'url' => isset($data['namespace']['slug']) ? 'https://hangar.papermc.io/'.$data['namespace']['owner'].'/'.$data['namespace']['slug'] : null,

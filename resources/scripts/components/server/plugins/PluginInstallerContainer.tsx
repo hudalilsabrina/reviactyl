@@ -10,6 +10,7 @@ import Can from '@/reviactyl/elements/Can';
 import { ServerContext } from '@/state/server';
 import { PluginProvider, PluginSearchResult, searchPlugins } from '@/api/server/plugins';
 import PluginDetailsModal from '@/components/server/plugins/PluginDetailsModal';
+import { formatCount } from '@/components/server/plugins/format';
 import { FaDownload, FaPuzzlePiece, FaSearch } from 'react-icons/fa';
 import classNames from 'classnames';
 
@@ -34,11 +35,14 @@ const PluginCard = ({ plugin, onClick }: { plugin: PluginSearchResult; onClick: 
         )}
         <div className='min-w-0 flex-1'>
             <p className='text-sm font-semibold text-gray-100 truncate'>{plugin.name}</p>
-            {plugin.author && <p className='text-xs text-gray-500 truncate'>{plugin.author}</p>}
+            {plugin.author && <p className='text-xs text-gray-500 truncate'>by {plugin.author}</p>}
             {plugin.description && <p className='text-xs text-gray-400 mt-1 line-clamp-2'>{plugin.description}</p>}
             {plugin.downloads !== null && plugin.downloads !== undefined && (
-                <p className='text-xs text-gray-500 mt-2 inline-flex items-center gap-1'>
-                    <FaDownload className='w-3 h-3' /> {plugin.downloads.toLocaleString()}
+                <p
+                    className='text-xs text-gray-500 mt-2 inline-flex items-center gap-1'
+                    title={plugin.downloads.toLocaleString()}
+                >
+                    <FaDownload className='w-3 h-3' /> {formatCount(plugin.downloads)}
                 </p>
             )}
         </div>

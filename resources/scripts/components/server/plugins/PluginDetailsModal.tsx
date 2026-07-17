@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 import Modal from '@/reviactyl/elements/Modal';
 import Select from '@/reviactyl/elements/Select';
 import Spinner from '@/reviactyl/elements/Spinner';
@@ -16,6 +18,16 @@ import {
     PluginVersion,
 } from '@/api/server/plugins';
 import { FaDownload, FaExternalLinkAlt, FaPuzzlePiece } from 'react-icons/fa';
+import { formatCount, formatGameVersions } from '@/components/server/plugins/format';
+
+// ponytail: Trust boundary — provider markup is untrusted, always sanitize before injecting.
+const sanitizeBody = (html: string): string =>
+    DOMPurify.sanitize(marked.parse(html, { async: false }) as string, {
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ['style', 'form', 'input', 'button', 'iframe', 'video', 'audio', 'object', 'embed'],
+        FORBID_ATTR: ['style'],
+        ADD_ATTR: ['target', 'rel'],
+    });
 
 interface Props {
     uuid: string;
@@ -54,6 +66,8 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
             .catch((error) => clearAndAddHttpError({ key: 'server:plugins', error }));
     }, [visible]);
 
+    const bodyHtml = useMemo(() => (details?.body_html ? sanitizeBody(details.body_html) : null), [details]);
+
     const install = () => {
         if (!selectedVersion) return;
 
@@ -91,8 +105,8 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                     {details?.author && <p className='text-sm text-gray-400'>{details.author}</p>}
                     <div className='flex items-center gap-4 mt-1 text-xs text-gray-500'>
                         {details?.downloads !== null && details?.downloads !== undefined && (
-                            <span className='inline-flex items-center gap-1'>
-                                <FaDownload /> {details.downloads.toLocaleString()}
+                            <span className='inline-flex items-center gap-1' title={details.downloads.toLocaleString()}>
+                                <FaDownload /> {formatCount(details.downloads)}
                             </span>
                         )}
                         {details?.url && (
@@ -112,6 +126,8 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
             <div className='mt-4 max-h-64 overflow-y-auto pr-1'>
                 {!details ? (
                     <Spinner size='base' centered />
+                ) : bodyHtml ? (
+                    <div className='plugin-body text-sm text-gray-300' dangerouslySetInnerHTML={{ __html: bodyHtml }} />
                 ) : (
                     <p className='text-sm text-gray-300 whitespace-pre-line'>
                         {details.body ?? details.description ?? t('no-description')}
@@ -126,12 +142,16 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                         <Spinner size='small' />
                     ) : (
                         <Select value={selectedVersion} onChange={(e) => setSelectedVersion(e.target.value)}>
-                            {versions.map((v) => (
-                                <option key={v.id} value={String(v.id)}>
-                                    {v.name}
-                                    {v.game_versions.length > 0 ? ` (${v.game_versions.slice(0, 4).join(', ')})` : ''}
-                                </option>
-                            ))}
+                            {versions.map((v) => {
+                                const supported = formatGameVersions(v.game_versions);
+
+                                return (
+                                    <option key={v.id} value={String(v.id)}>
+                                        {v.name}
+                                        {supported.length > 0 ? ` (${supported.join(', ')})` : ''}
+                                    </option>
+                                );
+                            })}
                         </Select>
                     )}
                 </div>
