@@ -162,10 +162,14 @@ class PluginProviderService
             $params['game_versions'] = json_encode([$mc]);
         }
 
-        $data = Http::acceptJson()
-            ->get('https://api.modrinth.com/v2/project/'.urlencode($id).'/version', $params)
-            ->throw()
-            ->json() ?? [];
+        $response = Http::acceptJson()
+            ->get('https://api.modrinth.com/v2/project/'.urlencode($id).'/version', $params);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $data = $response->json() ?? [];
 
         return array_values(array_map(fn ($v) => [
             'id' => $v['id'],
@@ -179,10 +183,13 @@ class PluginProviderService
 
     private function resolveModrinth(string $id, string $versionId): ?array
     {
-        $data = Http::acceptJson()
-            ->get('https://api.modrinth.com/v2/version/'.urlencode($versionId))
-            ->throw()
-            ->json();
+        $response = Http::acceptJson()->get('https://api.modrinth.com/v2/version/'.urlencode($versionId));
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
 
         $file = collect($data['files'] ?? [])->firstWhere('primary', true) ?? Arr::first($data['files'] ?? []);
 
@@ -245,14 +252,18 @@ class PluginProviderService
 
     private function versionsSpiget(string $id): array
     {
-        $data = Http::acceptJson()
+        $response = Http::acceptJson()
             ->get('https://api.spiget.org/v2/resources/'.urlencode($id).'/versions', [
                 'size' => 30,
                 'sort' => '-releaseDate',
                 'fields' => 'id,name,downloads,releaseDate',
-            ])
-            ->throw()
-            ->json() ?? [];
+            ]);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $data = $response->json() ?? [];
 
         return array_values(array_map(fn ($v) => [
             'id' => $v['id'],
@@ -356,10 +367,14 @@ class PluginProviderService
             $params['gameVersion'] = $mc;
         }
 
-        $data = $this->curseforge()
-            ->get('https://api.curseforge.com/v1/mods/'.urlencode($id).'/files', $params)
-            ->throw()
-            ->json('data') ?? [];
+        $response = $this->curseforge()
+            ->get('https://api.curseforge.com/v1/mods/'.urlencode($id).'/files', $params);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $data = $response->json('data') ?? [];
 
         return array_values(array_map(fn ($f) => [
             'id' => $f['id'],
@@ -373,10 +388,14 @@ class PluginProviderService
 
     private function resolveCurseForge(string $id, string $versionId): ?array
     {
-        $file = $this->curseforge()
-            ->get('https://api.curseforge.com/v1/mods/'.urlencode($id).'/files/'.urlencode($versionId))
-            ->throw()
-            ->json('data');
+        $response = $this->curseforge()
+            ->get('https://api.curseforge.com/v1/mods/'.urlencode($id).'/files/'.urlencode($versionId));
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $file = $response->json('data');
 
         $url = $file['downloadUrl'] ?? null;
         $filename = $file['fileName'] ?? null;
@@ -450,10 +469,14 @@ class PluginProviderService
 
     private function versionsHangar(string $id, Server $server): array
     {
-        $data = Http::acceptJson()
-            ->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions', ['limit' => 30])
-            ->throw()
-            ->json('result') ?? [];
+        $response = Http::acceptJson()
+            ->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions', ['limit' => 30]);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $data = $response->json('result') ?? [];
 
         $mc = $this->minecraftVersion($server);
         $versions = array_map(fn ($v) => [
@@ -476,10 +499,14 @@ class PluginProviderService
 
     private function resolveHangar(string $id, string $versionId): ?array
     {
-        $data = Http::acceptJson()
-            ->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions/'.urlencode($versionId))
-            ->throw()
-            ->json();
+        $response = Http::acceptJson()
+            ->get('https://hangar.papermc.io/api/v1/projects/'.urlencode($id).'/versions/'.urlencode($versionId));
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
 
         $url = Arr::get($data, 'downloads.PAPER.downloadUrl')
             ?? Arr::get($data, 'downloads.PAPER.externalUrl')
