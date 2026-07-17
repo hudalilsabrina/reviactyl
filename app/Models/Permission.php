@@ -97,6 +97,16 @@ class Permission extends Model
 
     public const ACTION_ACTIVITY_READ = 'activity.read';
 
+    public const ACTION_CONFIG_REVISION_READ = 'config-revision.read';
+
+    public const ACTION_CONFIG_REVISION_CREATE = 'config-revision.create';
+
+    public const ACTION_CONFIG_REVISION_REVERT = 'config-revision.revert';
+
+    public const ACTION_CONFIG_REVISION_PRESET = 'config-revision.preset';
+
+    public const ACTION_CONFIG_REVISION_MANAGE = 'config-revision.manage';
+
     /**
      * Should timestamps be used on this model.
      */
@@ -237,6 +247,17 @@ class Permission extends Model
             'description' => 'Permissions that control a user\'s access to the server activity logs.',
             'keys' => [
                 'read' => 'Allows a user to view the activity logs for the server.',
+            ],
+        ],
+
+        'config-revision' => [
+            'description' => 'Permissions that control access to server config revision history and version control.',
+            'keys' => [
+                'read' => 'Allows a user to view config revision history and file diffs.',
+                'create' => 'Allows a user to create manual snapshots of config files.',
+                'revert' => 'Allows a user to revert config files to a previous revision.',
+                'preset' => 'Allows a user to create and activate config presets.',
+                'manage' => 'Allows a user to manage watch patterns and revision settings.',
             ],
         ],
     ];

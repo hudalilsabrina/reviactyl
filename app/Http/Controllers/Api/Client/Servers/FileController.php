@@ -19,6 +19,7 @@ use App\Http\Requests\Api\Client\Servers\Files\RenameFileRequest;
 use App\Http\Requests\Api\Client\Servers\Files\WriteFileContentRequest;
 use App\Models\Server;
 use App\Repositories\Agent\DaemonFileRepository;
+use App\Services\ConfigRevisions\ConfigRevisionService;
 use App\Services\Nodes\NodeJWTService;
 use App\Transformers\Api\Client\FileObjectTransformer;
 use Carbon\CarbonImmutable;
@@ -112,6 +113,17 @@ class FileController extends ClientApiController
         $this->fileRepository->setServer($server)->putContent($request->get('file'), $request->getContent());
 
         Activity::event('server:file.write')->property('file', $request->get('file'))->log();
+
+        // Auto-snapshot for config revisions
+        if (config('panel.config_revisions.enabled') && config('panel.config_revisions.auto_snapshot_on_write')) {
+            $revisionService = app(ConfigRevisionService::class);
+            $revisionService->createSnapshot(
+                $server,
+                $request->user(),
+                [$request->get('file')],
+                'Auto-snapshot on file save',
+            );
+        }
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }

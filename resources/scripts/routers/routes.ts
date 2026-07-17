@@ -9,6 +9,7 @@ import NetworkContainer from '@/components/server/network/NetworkContainer';
 import StartupContainer from '@/components/server/startup/StartupContainer';
 import FileManagerContainer from '@/components/server/files/FileManagerContainer';
 import SettingsContainer from '@/components/server/settings/SettingsContainer';
+import ConfigRevisionsContainer from '@/components/server/config-revisions/ConfigRevisionsContainer';
 import AccountOverviewContainer from '@/components/dashboard/AccountOverviewContainer';
 import AccountApiContainer from '@/components/dashboard/AccountApiContainer';
 import AccountSSHContainer from '@/components/dashboard/ssh/AccountSSHContainer';
@@ -19,6 +20,7 @@ import {
     FaBoxArchive,
     FaCalendar,
     FaChartLine,
+    FaCodeBranch,
     FaDatabase,
     FaEye,
     FaFolder,
@@ -178,6 +180,13 @@ export default {
                 name: 'server.backups',
                 component: BackupContainer,
                 icon: FaBoxArchive,
+            },
+            {
+                route: 'config-revisions/*',
+                permission: 'config-revision.*',
+                name: 'server.config-revisions',
+                component: ConfigRevisionsContainer,
+                icon: FaCodeBranch,
             },
         ],
         administration: [

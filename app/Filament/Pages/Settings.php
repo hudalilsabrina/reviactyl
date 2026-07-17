@@ -96,6 +96,10 @@ class Settings extends Page implements HasSchemas
         'subdomains:cloudflare_zone_ids',
         'subdomains:base_domains',
         'subdomains:max_per_server',
+
+        'panel:config_revisions:enabled',
+        'panel:config_revisions:auto_snapshot_on_write',
+        'panel:config_revisions:max_revisions_per_server',
     ];
 
     public function getHeading(): string
@@ -240,6 +244,11 @@ class Settings extends Page implements HasSchemas
                         ->label(trans('admin/settings.subdomains.title'))
                         ->icon('tabler-link')
                         ->schema($this->subdomainSettings()),
+
+                    Tab::make('config-revisions')
+                        ->label(trans('admin/settings.config-revisions.title', 'Config Revisions'))
+                        ->icon('tabler-git-branch')
+                        ->schema($this->configRevisionsSettings()),
                 ]),
         ];
     }
@@ -721,6 +730,50 @@ class Settings extends Page implements HasSchemas
                             ->action('testCloudflare')
                             ->color('success'),
                     ])->fullWidth(),
+                ]),
+        ];
+    }
+
+    private function configRevisionsSettings(): array
+    {
+        return [
+            Section::make(trans('admin/settings.config-revisions.section_title', 'Config Revisions'))
+                ->description(trans('admin/settings.config-revisions.section_description', 'Enable version control for server configuration files. Track changes, view diffs, and rollback to previous versions.'))
+                ->columns(4)
+                ->icon('tabler-git-branch')
+                ->schema([
+                    Toggle::make('panel:config_revisions:enabled')
+                        ->label(trans('admin/settings.config-revisions.enabled', 'Enable Config Revisions'))
+                        ->helperText(trans('admin/settings.config-revisions.enabled_helper', 'Allow server config files to be versioned when edited through the panel.'))
+                        ->inline(false)
+                        ->onIcon('tabler-check')
+                        ->offIcon('tabler-x')
+                        ->onColor('success')
+                        ->offColor('danger')
+                        ->live()
+                        ->columnSpan(4),
+
+                    Toggle::make('panel:config_revisions:auto_snapshot_on_write')
+                        ->label(trans('admin/settings.config-revisions.auto_snapshot', 'Auto-snapshot on file save'))
+                        ->helperText(trans('admin/settings.config-revisions.auto_snapshot_helper', 'Automatically create a revision when a config file is saved through the panel editor.'))
+                        ->inline(false)
+                        ->onIcon('tabler-check')
+                        ->offIcon('tabler-x')
+                        ->onColor('success')
+                        ->offColor('danger')
+                        ->visible(fn ($get) => $get('panel:config_revisions:enabled'))
+                        ->columnSpan(4),
+
+                    TextInput::make('panel:config_revisions:max_revisions_per_server')
+                        ->label(trans('admin/settings.config-revisions.max_revisions', 'Max revisions per server'))
+                        ->helperText(trans('admin/settings.config-revisions.max_revisions_helper', 'Maximum number of non-preset revisions kept per server. Oldest are pruned first.'))
+                        ->numeric()
+                        ->default(200)
+                        ->minValue(10)
+                        ->maxValue(10000)
+                        ->required()
+                        ->visible(fn ($get) => $get('panel:config_revisions:enabled'))
+                        ->columnSpan(2),
                 ]),
         ];
     }
