@@ -88,6 +88,13 @@ jobs:
           php-version: '8.3'
           coverage: none
 
+      - name: Prepare Environment
+        run: |
+          cp .env.ci .env
+          mkdir -p storage/framework/{sessions,views,cache,testing}
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+
       - name: Cache Composer
         uses: actions/cache@v4
         with:

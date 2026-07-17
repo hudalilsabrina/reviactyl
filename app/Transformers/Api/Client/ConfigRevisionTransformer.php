@@ -32,7 +32,7 @@ class ConfigRevisionTransformer extends BaseClientTransformer
             'files' => $revision->relationLoaded('files')
                 ? $revision->files->pluck('file_path')->toArray()
                 : [],
-            'created_at' => $revision->created_at?->toAtomString(),
+            'created_at' => $revision->created_at->toAtomString(),
         ];
     }
 }

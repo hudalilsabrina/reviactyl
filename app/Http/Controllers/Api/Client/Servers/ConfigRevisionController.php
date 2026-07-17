@@ -35,7 +35,9 @@ class ConfigRevisionController extends ClientApiController
 
         $revisions = $this->revisionService->getRevisionHistory($server, $perPage, $presetsOnly);
 
-        return $this->fractal->paginatedCollection($revisions, ConfigRevisionTransformer::class);
+        return $this->fractal->collection($revisions)
+            ->transformWith($this->getTransformer(ConfigRevisionTransformer::class))
+            ->toArray();
     }
 
     public function show(Server $server, int $revision): JsonResponse
