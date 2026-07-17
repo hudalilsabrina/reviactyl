@@ -4,7 +4,7 @@ export interface ConfigRevision {
     id: number;
     hash: string;
     message: string;
-    author: { uuid: string; username: string };
+    author: { uuid: string | null; username: string };
     file_count: number;
     is_preset: boolean;
     preset_name: string | null;
