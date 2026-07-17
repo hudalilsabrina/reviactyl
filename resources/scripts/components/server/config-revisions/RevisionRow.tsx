@@ -46,7 +46,7 @@ const RevisionRow = ({ revision, isSelected, onViewDiff, onRevert, onPromote }: 
                     <p css={tw`text-sm text-gray-200 mb-1`}>{revision.message}</p>
 
                     <div css={tw`flex items-center gap-2 text-xs text-gray-500`}>
-                        <span>{revision.author.username}</span>
+                        <span>{revision.author?.username ?? 'Unknown'}</span>
                         <span>&middot;</span>
                         <span>{new Date(revision.created_at).toLocaleString()}</span>
                     </div>
