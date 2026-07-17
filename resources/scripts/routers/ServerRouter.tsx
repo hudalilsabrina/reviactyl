@@ -40,6 +40,11 @@ const NavItem = ({ route }: NavItemProps) => {
 
     const nestId = ServerContext.useStoreState((state) => state.server.data?.nestId);
     const eggId = ServerContext.useStoreState((state) => state.server.data?.eggId);
+    const siteSettings = useStoreState((state) => state.settings.data);
+
+    if (route.setting && siteSettings && siteSettings[route.setting as keyof typeof siteSettings] === false) {
+        return null;
+    }
 
     const allowed =
         (route.nestIds && route.nestIds.includes(nestId ?? 0)) ||
@@ -207,6 +212,7 @@ export default function ServerRouter() {
 
     const isUnderMaintenance = useStoreState((state) => state.designify.data?.isUnderMaintenance);
     const rootAdmin = useStoreState((state) => state.user.data?.rootAdmin);
+    const siteSettings = useStoreState((state) => state.settings.data);
 
     const [error, setError] = useState('');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -238,12 +244,19 @@ export default function ServerRouter() {
 
     const allRoutes = [...routes.server.control, ...routes.server.management, ...routes.server.administration];
 
-    const routeAllowed = (route: any) =>
-        (route.nestIds && route.nestIds.includes(serverNestId ?? 0)) ||
-        (route.eggIds && route.eggIds.includes(serverEggId ?? 0)) ||
-        (route.nestId && route.nestId === serverNestId) ||
-        (route.eggId && route.eggId === serverEggId) ||
-        (!route.eggIds && !route.nestIds && !route.nestId && !route.eggId);
+    const routeAllowed = (route: any) => {
+        if (route.setting && siteSettings && siteSettings[route.setting as keyof typeof siteSettings] === false) {
+            return false;
+        }
+
+        return (
+            (route.nestIds && route.nestIds.includes(serverNestId ?? 0)) ||
+            (route.eggIds && route.eggIds.includes(serverEggId ?? 0)) ||
+            (route.nestId && route.nestId === serverNestId) ||
+            (route.eggId && route.eggId === serverEggId) ||
+            (!route.eggIds && !route.nestIds && !route.nestId && !route.eggId)
+        );
+    };
 
     const injectedRoutes = useExtensionRoutes('serverRouter', {
         eggId: serverEggId,

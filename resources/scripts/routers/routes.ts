@@ -59,6 +59,7 @@ interface ServerRouteDefinition extends RouteDefinition {
     eggId?: number;
     nestIds?: number[];
     eggIds?: number[];
+    setting?: keyof import('@/state/settings').SiteSettings;
 }
 
 interface Routes {
@@ -187,6 +188,7 @@ export default {
                 name: 'server.config-revisions',
                 component: ConfigRevisionsContainer,
                 icon: FaCodeBranch,
+                setting: 'configRevisionsEnabled',
             },
         ],
         administration: [

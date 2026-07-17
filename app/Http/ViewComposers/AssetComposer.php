@@ -20,6 +20,7 @@ class AssetComposer
             'debug' => config('app.debug', false),
             'avatar' => config('app.avatar') ?? 'gravatar',
             'registrationEnabled' => config('panel.auth.registration_enabled', true),
+            'configRevisionsEnabled' => config('panel.config_revisions.enabled', true),
             'captcha' => [
                 'provider' => config('captcha.provider', 'disable'),
                 'recaptcha' => [
