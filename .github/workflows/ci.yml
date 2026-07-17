@@ -127,10 +127,7 @@ jobs:
 
       - name: Prepare Environment
         run: |
-          cp .env.example .env
-          sed -i 's|^#DB_DATABASE=panel|DB_DATABASE=${{ github.workspace }}/database/database.sqlite|' .env
-          sed -i 's|QUEUE_CONNECTION=redis|QUEUE_CONNECTION=sync|' .env
-          touch database/database.sqlite
+          cp .env.ci .env
           mkdir -p storage/framework/{sessions,views,cache,testing}
           mkdir -p storage/logs
           mkdir -p bootstrap/cache
@@ -147,10 +144,8 @@ jobs:
       - name: Install Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Generate Key & Migrate
-        run: |
-          php artisan key:generate
-          php artisan migrate --force
+      - name: Generate App Key
+        run: php artisan key:generate
 
       - name: Pest Tests
         run: php artisan test --parallel
