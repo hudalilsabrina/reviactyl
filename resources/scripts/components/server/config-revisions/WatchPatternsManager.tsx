@@ -3,6 +3,8 @@ import tw from 'twin.macro';
 import Card from '@/reviactyl/ui/Card';
 import Button from '@/reviactyl/elements/Button';
 import { getWatchPatterns, updateWatchPatterns, resetWatchPatterns } from '@/api/server/configRevisions';
+import { httpErrorToHuman } from '@/api/http';
+import useFlash from '@/plugins/useFlash';
 
 interface Props {
     uuid: string;
@@ -10,6 +12,7 @@ interface Props {
 }
 
 const WatchPatternsManager = ({ uuid, onDismiss }: Props) => {
+    const { clearAndAddHttpError } = useFlash();
     const [isCustom, setIsCustom] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -21,6 +24,7 @@ const WatchPatternsManager = ({ uuid, onDismiss }: Props) => {
                 setIsCustom(data.is_custom);
                 setPatternsInput(data.patterns.join('\n'));
             })
+            .catch((error) => clearAndAddHttpError({ key: 'config-revisions', error: httpErrorToHuman(error) }))
             .finally(() => setLoading(false));
     }, [uuid]);
 
@@ -33,6 +37,8 @@ const WatchPatternsManager = ({ uuid, onDismiss }: Props) => {
                 .filter(Boolean);
             await updateWatchPatterns(uuid, newPatterns);
             setIsCustom(true);
+        } catch (error) {
+            clearAndAddHttpError({ key: 'config-revisions', error: httpErrorToHuman(error) });
         } finally {
             setSaving(false);
         }
@@ -44,6 +50,8 @@ const WatchPatternsManager = ({ uuid, onDismiss }: Props) => {
             const data = await resetWatchPatterns(uuid);
             setIsCustom(false);
             setPatternsInput(data.patterns.join('\n'));
+        } catch (error) {
+            clearAndAddHttpError({ key: 'config-revisions', error: httpErrorToHuman(error) });
         } finally {
             setSaving(false);
         }

@@ -34,7 +34,7 @@ export interface ConfigDiff {
 export interface WatchPatternsResponse {
     patterns: string[];
     is_custom: boolean;
-    defaults: string[];
+    defaults?: string[];
 }
 
 export const getRevisions = async (uuid: string, page = 1, perPage = 25, presetsOnly = false) => {
@@ -58,7 +58,7 @@ export const getRevisionDetail = async (
 
 export const getRevisionFiles = async (uuid: string, revisionId: number) => {
     const { data } = await http.get(`/api/client/servers/${uuid}/config-revisions/${revisionId}/files`);
-    return data.files as Array<{
+    return (data.files ?? []) as Array<{
         path: string;
         content_hash: string;
         content_length: number;

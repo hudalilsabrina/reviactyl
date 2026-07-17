@@ -53,7 +53,7 @@ const ConfigRevisionsContainer = () => {
         try {
             const data = await getRevisions(uuid, page);
             setRevisions(data.data || []);
-            setTotalPages(data.last_page || 1);
+            setTotalPages(data.total_pages || 1);
         } catch (error) {
             clearAndAddHttpError({ key: 'config-revisions', error: httpErrorToHuman(error) });
         } finally {
@@ -145,7 +145,9 @@ const ConfigRevisionsContainer = () => {
         setDiffLoading(true);
 
         try {
-            const diffData = await compareRevisions(uuid, revisionA, revisionB);
+            const diffData = revisionB === 0
+                ? await diffAgainstCurrent(uuid, revisionA)
+                : await compareRevisions(uuid, revisionA, revisionB);
             setDiff(diffData);
             setSelectedRevision(revisions.find((r) => r.id === revisionA) || null);
         } catch (error) {

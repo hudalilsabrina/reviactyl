@@ -24,14 +24,18 @@ const PresetManager = ({ presets, onActivate, onDelete }: Props) => {
                             </span>
                         </div>
                         <div css={tw`flex gap-2`}>
-                            <Button size={'xsmall'} color={'green'} onClick={() => onActivate(preset.preset_name!)}>
+                            <Button
+                                size={'xsmall'}
+                                color={'green'}
+                                onClick={() => preset.preset_name && onActivate(preset.preset_name)}
+                            >
                                 Activate
                             </Button>
                             <Button
                                 size={'xsmall'}
                                 isSecondary
                                 color={'red'}
-                                onClick={() => onDelete(preset.preset_name!)}
+                                onClick={() => preset.preset_name && onDelete(preset.preset_name)}
                             >
                                 Remove
                             </Button>

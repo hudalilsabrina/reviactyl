@@ -44,6 +44,7 @@ class SettingsServiceProvider extends ServiceProvider
         'panel:config_revisions:enabled',
         'panel:config_revisions:auto_snapshot_on_write',
         'panel:config_revisions:max_revisions_per_server',
+        'panel:config_revisions:max_presets_per_server',
     ];
 
     protected array $designifyKeys = [
