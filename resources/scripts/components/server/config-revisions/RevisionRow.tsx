@@ -26,7 +26,7 @@ const RevisionRow = ({ revision, isSelected, onViewDiff, onRevert, onPromote }: 
     };
 
     return (
-        <Card css={tw`mb-2 ${isSelected ? 'border-primary-500' : ''}`}>
+        <Card css={[tw`mb-2`, isSelected && tw`border-primary-500`]}>
             <div css={tw`flex items-start justify-between`}>
                 <div css={tw`flex-1 min-w-0`}>
                     <div css={tw`flex items-center gap-2 mb-1`}>

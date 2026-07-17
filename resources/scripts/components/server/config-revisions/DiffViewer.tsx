@@ -27,13 +27,14 @@ const DiffViewer = ({ diff, loading }: Props) => {
                 <div key={filePath}>
                     <div css={tw`flex items-center gap-2 mb-2 px-3 py-2 bg-gray-800 rounded-t`}>
                         <span
-                            css={tw`text-xs font-bold rounded px-1.5 py-0.5 ${
+                            css={[
+                                tw`text-xs font-bold rounded px-1.5 py-0.5`,
                                 fileDiff.status === 'added'
-                                    ? 'bg-green-500/20 text-green-400'
+                                    ? tw`bg-green-500/20 text-green-400`
                                     : fileDiff.status === 'deleted'
-                                    ? 'bg-red-500/20 text-red-400'
-                                    : 'bg-yellow-500/20 text-yellow-400'
-                            }`}
+                                    ? tw`bg-red-500/20 text-red-400`
+                                    : tw`bg-yellow-500/20 text-yellow-400`,
+                            ]}
                         >
                             {fileDiff.status === 'added' ? 'A' : fileDiff.status === 'deleted' ? 'D' : 'M'}
                         </span>
@@ -47,7 +48,7 @@ const DiffViewer = ({ diff, loading }: Props) => {
                     <div css={tw`font-mono text-xs overflow-x-auto bg-gray-950 rounded-b border border-gray-800`}>
                         {fileDiff.hunks.map((hunk, hunkIdx) => (
                             <div key={hunkIdx}>
-                                <div css={tw`bg-gray-800/50 px-3 py-1 text-gray-500 border-y border-gray-800`}>
+                                <div css={tw`bg-gray-800/50 px-3 py-1 text-gray-500 border-t border-b border-gray-800`}>
                                     @@ -{hunk.old_start},{hunk.old_lines} +{hunk.new_start},{hunk.new_lines} @@
                                 </div>
                                 {hunk.lines.map((line, lineIdx) => {
@@ -57,13 +58,14 @@ const DiffViewer = ({ diff, loading }: Props) => {
                                     return (
                                         <div
                                             key={lineIdx}
-                                            css={tw`px-3 py-0.5 ${
+                                            css={[
+                                                tw`px-3 py-0.5`,
                                                 prefix === '+'
-                                                    ? 'bg-green-500/10 text-green-300'
+                                                    ? tw`bg-green-500/10 text-green-300`
                                                     : prefix === '-'
-                                                    ? 'bg-red-500/10 text-red-300'
-                                                    : 'text-gray-400'
-                                            }`}
+                                                    ? tw`bg-red-500/10 text-red-300`
+                                                    : tw`text-gray-400`,
+                                            ]}
                                         >
                                             <span css={tw`select-none text-gray-600 mr-2`}>{prefix}</span>
                                             {content}
