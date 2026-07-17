@@ -211,13 +211,18 @@ class PluginProviderService
 
     private function searchSpiget(string $query, int $offset): array
     {
+        $params = [
+            'size' => 20,
+            'page' => intdiv($offset, 20) + 1,
+            'sort' => '-downloads',
+            'fields' => 'id,name,tag,downloads,author,icon,premium,external',
+        ];
+
+        // The search endpoint 404s on an empty term; fall back to the resource listing.
         $data = Http::acceptJson()
-            ->get('https://api.spiget.org/v2/search/resources/'.urlencode($query), [
-                'size' => 20,
-                'page' => intdiv($offset, 20) + 1,
-                'sort' => '-downloads',
-                'fields' => 'id,name,tag,downloads,author,icon,premium,external',
-            ])
+            ->get($query === ''
+                ? 'https://api.spiget.org/v2/resources'
+                : 'https://api.spiget.org/v2/search/resources/'.urlencode($query), $params)
             ->throw()
             ->json() ?? [];
 
