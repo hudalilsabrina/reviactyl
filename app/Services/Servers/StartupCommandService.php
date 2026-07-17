@@ -25,14 +25,54 @@ class StartupCommandService
             $replace[] = ($variable->user_viewable && ! $hideAllValues) ? ($variable->server_value ?? $variable->default_value) : '[hidden]';
         }
 
-        $command = Str::replace($find, $replace, $server->startup);
+        $template = $this->resolveStartupTemplate($server);
+        $command = Str::replace($find, $replace, $template);
 
-        // If no {{STARTUP_PARTS}} placeholder existed but parts are defined, append them
-        if ($partsString && ! str_contains($server->startup, '{{STARTUP_PARTS}}')) {
+        // Fallback: append parts at the end if the template doesn't use {{STARTUP_PARTS}}.
+        if ($partsString && ! str_contains($template, '{{STARTUP_PARTS}}')) {
             $command = rtrim($command).' '.$partsString;
         }
 
         return $command;
+    }
+
+    /**
+     * Build the daemon invocation command with startup parts injected but
+     * all other {{VAR}} placeholders left unresolved for the daemon.
+     */
+    public function getDaemonInvocation(Server $server): string
+    {
+        $partsString = $this->buildPartsString($server);
+        if (empty($partsString)) {
+            return $server->startup;
+        }
+
+        $template = $this->resolveStartupTemplate($server);
+
+        if (str_contains($template, '{{STARTUP_PARTS}}')) {
+            return str_replace('{{STARTUP_PARTS}}', $partsString, $template);
+        }
+
+        return rtrim($server->startup).' '.$partsString;
+    }
+
+    /**
+     * Resolve the startup template to use for building the command.
+     * If the server's startup has {{STARTUP_PARTS}}, use it. Otherwise
+     * fall back to the egg's startup template which may have it.
+     */
+    private function resolveStartupTemplate(Server $server): string
+    {
+        if (str_contains($server->startup, '{{STARTUP_PARTS}}')) {
+            return $server->startup;
+        }
+
+        $eggStartup = $server->egg->startup ?? '';
+        if (str_contains($eggStartup, '{{STARTUP_PARTS}}')) {
+            return $eggStartup;
+        }
+
+        return $server->startup;
     }
 
     /**

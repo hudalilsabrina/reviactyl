@@ -10,7 +10,7 @@ class ServerConfigurationStructureService
     /**
      * ServerConfigurationStructureService constructor.
      */
-    public function __construct(private EnvironmentService $environment) {}
+    public function __construct(private EnvironmentService $environment, private StartupCommandService $startupCommandService) {}
 
     /**
      * Return a configuration array for a specific server when passed a server model.
@@ -48,7 +48,7 @@ class ServerConfigurationStructureService
             ],
             'suspended' => $server->isSuspended(),
             'environment' => $this->environment->handle($server),
-            'invocation' => $server->startup,
+            'invocation' => $this->startupCommandService->getDaemonInvocation($server),
             'skip_egg_scripts' => $server->skip_scripts,
             'build' => [
                 'memory_limit' => $server->memory,

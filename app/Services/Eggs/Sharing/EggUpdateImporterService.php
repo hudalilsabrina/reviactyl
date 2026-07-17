@@ -6,6 +6,7 @@ use App\Exceptions\Service\InvalidFileUploadException;
 use App\Models\Egg;
 use App\Models\EggStartupPart;
 use App\Models\EggVariable;
+use App\Models\Server;
 use App\Services\Eggs\EggParserService;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\UploadedFile;
@@ -26,8 +27,9 @@ class EggUpdateImporterService
     public function handle(Egg $egg, UploadedFile $file): Egg
     {
         $parsed = $this->parser->handle($file);
+        $oldStartup = $egg->startup;
 
-        return $this->connection->transaction(function () use ($egg, $parsed) {
+        return $this->connection->transaction(function () use ($egg, $parsed, $oldStartup) {
             $egg = $this->parser->fillFromParsed($egg, $parsed);
             $egg->save();
 
@@ -56,6 +58,14 @@ class EggUpdateImporterService
             $importedParts = array_map(fn ($value) => $value['name'], $parsed['startup_parts'] ?? []);
 
             $egg->startupParts()->whereNotIn('name', $importedParts)->delete();
+
+            // Sync servers whose startup still matches the old egg startup.
+            if ($oldStartup !== $egg->startup) {
+                Server::query()
+                    ->where('egg_id', $egg->id)
+                    ->where('startup', $oldStartup)
+                    ->update(['startup' => $egg->startup]);
+            }
 
             return $egg->refresh();
         });
