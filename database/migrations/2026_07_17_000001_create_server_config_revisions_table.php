@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::dropIfExists('server_config_watch_patterns');
+        Schema::dropIfExists('server_config_files');
+        Schema::dropIfExists('server_config_revisions');
+
         Schema::create('server_config_revisions', function (Blueprint $table) {
             $table->unsignedInteger('id', true);
             $table->unsignedInteger('server_id');
