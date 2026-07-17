@@ -90,13 +90,13 @@ class CloudflareDnsService
         ]);
 
         if (! $response->successful() || ! $response->json('success')) {
-            // On lookup failure, assume record doesn't exist to allow creation attempt
             Log::warning('Cloudflare recordExists check failed', [
                 'name' => $name,
                 'status' => $response->status(),
             ]);
 
-            return false;
+            // Fail closed — assume record exists to prevent duplicate creation attempts
+            return true;
         }
 
         return $response->json('result_info.total_count', 0) > 0;

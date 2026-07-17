@@ -6,6 +6,7 @@ use App\Contracts\Repository\SettingsRepositoryInterface;
 use App\Exceptions\DisplayException;
 use App\Models\Server;
 use App\Models\ServerSubdomain;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -14,6 +15,7 @@ class SubdomainService
 {
     public function __construct(
         private readonly SettingsRepositoryInterface $settings,
+        private readonly Encrypter $encrypter,
     ) {}
 
     /**
@@ -181,7 +183,7 @@ class SubdomainService
 
         $fullDomain = $subdomain.'.'.$domain;
 
-        // Check if this subdomain is already used
+        // Quick DB uniqueness check — not authoritative, the unique constraint is
         $existing = ServerSubdomain::where('subdomain', $subdomain)
             ->where('domain', $domain)
             ->first();
@@ -190,25 +192,21 @@ class SubdomainService
             throw new DisplayException("The subdomain '{$fullDomain}' is already in use.");
         }
 
-        // Check Cloudflare too
-        $zoneId = $this->getZoneIdForDomain($domain);
-        $cloudflare = $this->getCloudflareService($zoneId);
-
-        if ($cloudflare->recordExists($fullDomain)) {
-            throw new DisplayException("A DNS record for '{$fullDomain}' already exists in Cloudflare.");
-        }
-
         $ipAddress = $this->resolveAllocationIp($server);
         if (! $ipAddress) {
             throw new DisplayException('Could not determine an IP address for this server.');
         }
 
+        // Create CF record first — if it fails, nothing to roll back
+        $zoneId = $this->getZoneIdForDomain($domain);
+        $cloudflare = $this->getCloudflareService($zoneId);
         $recordId = $cloudflare->createARecord($fullDomain, $ipAddress);
 
         if (! $recordId) {
             throw new DisplayException('Failed to create DNS record in Cloudflare.');
         }
 
+        // DB insert — unique constraint prevents races; clean up CF on failure
         try {
             return ServerSubdomain::create([
                 'server_id' => $server->id,
@@ -218,7 +216,7 @@ class SubdomainService
                 'ip_address' => $ipAddress,
                 'is_auto_generated' => false,
             ]);
-        } catch (QueryException $e) {
+        } catch (QueryException) {
             $cloudflare->deleteRecord($recordId);
             throw new DisplayException("The subdomain '{$fullDomain}' is already in use.");
         }
@@ -394,7 +392,17 @@ class SubdomainService
 
     private function getApiToken(): ?string
     {
-        return $this->settings->get('settings::subdomains:cloudflare_api_token', null);
+        $token = $this->settings->get('settings::subdomains:cloudflare_api_token', null);
+
+        if (empty($token)) {
+            return null;
+        }
+
+        try {
+            return $this->encrypter->decrypt($token);
+        } catch (\Throwable) {
+            return $token;
+        }
     }
 
     public function getMaxPerServer(): int
