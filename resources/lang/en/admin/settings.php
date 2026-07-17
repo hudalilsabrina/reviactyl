@@ -126,6 +126,17 @@ return [
 <p><em>Note: The API token needs <strong>Zone:Zone:Read</strong> and <strong>Zone:DNS:Edit</strong> permissions.</em></p>
 EOT,
     ],
+    'config-revisions' => [
+        'title' => 'Config Revisions',
+        'section_title' => 'Config Revisions',
+        'section_description' => 'Enable version control for server configuration files. Track changes, view diffs, and rollback to previous versions.',
+        'enabled' => 'Enable Config Revisions',
+        'enabled_helper' => 'Allow server config files to be versioned when edited through the panel.',
+        'auto_snapshot' => 'Auto-snapshot on file save',
+        'auto_snapshot_helper' => 'Automatically create a revision when a config file is saved through the panel editor.',
+        'max_revisions' => 'Max revisions per server',
+        'max_revisions_helper' => 'Maximum number of non-preset revisions kept per server. Oldest are pruned first.',
+    ],
     'social' => [
         'title' => 'Social Login',
         'subtitle' => 'Configure social login providers.',

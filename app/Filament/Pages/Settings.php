@@ -246,7 +246,7 @@ class Settings extends Page implements HasSchemas
                         ->schema($this->subdomainSettings()),
 
                     Tab::make('config-revisions')
-                        ->label(trans('admin/settings.config-revisions.title', 'Config Revisions'))
+                        ->label(trans('admin/settings.config-revisions.title'))
                         ->icon('tabler-git-branch')
                         ->schema($this->configRevisionsSettings()),
                 ]),
@@ -737,14 +737,14 @@ class Settings extends Page implements HasSchemas
     private function configRevisionsSettings(): array
     {
         return [
-            Section::make(trans('admin/settings.config-revisions.section_title', 'Config Revisions'))
-                ->description(trans('admin/settings.config-revisions.section_description', 'Enable version control for server configuration files. Track changes, view diffs, and rollback to previous versions.'))
+            Section::make(trans('admin/settings.config-revisions.section_title'))
+                ->description(trans('admin/settings.config-revisions.section_description'))
                 ->columns(4)
                 ->icon('tabler-git-branch')
                 ->schema([
                     Toggle::make('panel:config_revisions:enabled')
-                        ->label(trans('admin/settings.config-revisions.enabled', 'Enable Config Revisions'))
-                        ->helperText(trans('admin/settings.config-revisions.enabled_helper', 'Allow server config files to be versioned when edited through the panel.'))
+                        ->label(trans('admin/settings.config-revisions.enabled'))
+                        ->helperText(trans('admin/settings.config-revisions.enabled_helper'))
                         ->inline(false)
                         ->onIcon('tabler-check')
                         ->offIcon('tabler-x')
@@ -754,8 +754,8 @@ class Settings extends Page implements HasSchemas
                         ->columnSpan(4),
 
                     Toggle::make('panel:config_revisions:auto_snapshot_on_write')
-                        ->label(trans('admin/settings.config-revisions.auto_snapshot', 'Auto-snapshot on file save'))
-                        ->helperText(trans('admin/settings.config-revisions.auto_snapshot_helper', 'Automatically create a revision when a config file is saved through the panel editor.'))
+                        ->label(trans('admin/settings.config-revisions.auto_snapshot'))
+                        ->helperText(trans('admin/settings.config-revisions.auto_snapshot_helper'))
                         ->inline(false)
                         ->onIcon('tabler-check')
                         ->offIcon('tabler-x')
@@ -765,8 +765,8 @@ class Settings extends Page implements HasSchemas
                         ->columnSpan(4),
 
                     TextInput::make('panel:config_revisions:max_revisions_per_server')
-                        ->label(trans('admin/settings.config-revisions.max_revisions', 'Max revisions per server'))
-                        ->helperText(trans('admin/settings.config-revisions.max_revisions_helper', 'Maximum number of non-preset revisions kept per server. Oldest are pruned first.'))
+                        ->label(trans('admin/settings.config-revisions.max_revisions'))
+                        ->helperText(trans('admin/settings.config-revisions.max_revisions_helper'))
                         ->numeric()
                         ->default(200)
                         ->minValue(10)
