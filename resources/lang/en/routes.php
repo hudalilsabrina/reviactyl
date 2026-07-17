@@ -18,6 +18,7 @@ return [
     'server' => [
         'console' => 'Console',
         'files' => 'Files',
+        'plugins' => 'Plugins',
         'startup' => 'Startup',
         'network' => 'Network',
         'metrics' => 'Metrics',

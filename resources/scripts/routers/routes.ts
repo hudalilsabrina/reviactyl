@@ -8,6 +8,7 @@ import BackupContainer from '@/components/server/backups/BackupContainer';
 import NetworkContainer from '@/components/server/network/NetworkContainer';
 import StartupContainer from '@/components/server/startup/StartupContainer';
 import FileManagerContainer from '@/components/server/files/FileManagerContainer';
+import PluginInstallerContainer from '@/components/server/plugins/PluginInstallerContainer';
 import SettingsContainer from '@/components/server/settings/SettingsContainer';
 import ConfigRevisionsContainer from '@/components/server/config-revisions/ConfigRevisionsContainer';
 import AccountOverviewContainer from '@/components/dashboard/AccountOverviewContainer';
@@ -28,6 +29,7 @@ import {
     FaKey,
     FaLock,
     FaPlay,
+    FaPuzzlePiece,
     FaTerminal,
     FaUser,
     FaUsers,
@@ -131,6 +133,13 @@ export default {
                 permission: 'file.*',
                 name: undefined,
                 component: FileEditContainer,
+            },
+            {
+                route: 'plugins/*',
+                permission: 'file.create',
+                name: 'server.plugins',
+                component: PluginInstallerContainer,
+                icon: FaPuzzlePiece,
             },
             {
                 route: 'startup/*',

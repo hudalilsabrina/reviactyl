@@ -82,6 +82,10 @@ return [
         'connect_timeout' => env('GUZZLE_CONNECT_TIMEOUT', 5),
     ],
 
+    'plugins' => [
+        'curseforge_api_key' => env('CURSEFORGE_API_KEY'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | CDN

@@ -100,6 +100,8 @@ class Settings extends Page implements HasSchemas
         'panel:config_revisions:enabled',
         'panel:config_revisions:auto_snapshot_on_write',
         'panel:config_revisions:max_revisions_per_server',
+
+        'panel:plugins:curseforge_api_key',
     ];
 
     public function getHeading(): string
@@ -634,6 +636,18 @@ class Settings extends Page implements HasSchemas
                         ->required(fn ($get) => $get('panel:client_features:allocations:enabled'))
                         ->visible(fn ($get) => $get('panel:client_features:allocations:enabled'))
                         ->columnSpan(1),
+                ]),
+
+            Section::make('Plugin Installer')
+                ->columns(4)
+                ->schema([
+                    TextInput::make('panel:plugins:curseforge_api_key')
+                        ->label('CurseForge API Key')
+                        ->helperText('Required to enable the CurseForge provider in the server plugin installer. Create one at console.curseforge.com.')
+                        ->password()
+                        ->revealable()
+                        ->maxLength(255)
+                        ->columnSpan(4),
                 ]),
         ];
     }

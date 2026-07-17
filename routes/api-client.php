@@ -114,6 +114,14 @@ Route::group([
         Route::get('/upload', Client\Servers\FileUploadController::class);
     });
 
+    Route::group(['prefix' => '/plugins'], function () {
+        Route::get('/search', [Client\Servers\PluginInstallerController::class, 'search']);
+        Route::get('/{provider}/{plugin}', [Client\Servers\PluginInstallerController::class, 'details']);
+        Route::get('/{provider}/{plugin}/versions', [Client\Servers\PluginInstallerController::class, 'versions']);
+        Route::post('/install', [Client\Servers\PluginInstallerController::class, 'install'])
+            ->middleware([ResourceLimit::FilePull->middleware()]);
+    });
+
     Route::group(['prefix' => '/schedules'], function () {
         Route::get('/', [Client\Servers\ScheduleController::class, 'index']);
         Route::middleware([ResourceLimit::Schedule->middleware()])
