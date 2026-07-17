@@ -13,19 +13,26 @@ class ConfigRevisionTransformer extends BaseClientTransformer
 
     public function transform(ServerConfigRevision $revision): array
     {
+        $author = $revision->relationLoaded('author') ? $revision->author : null;
+
         return [
             'id' => $revision->id,
             'hash' => $revision->hash,
             'message' => $revision->message,
-            'author' => [
-                'uuid' => $revision->author->uuid,
-                'username' => $revision->author->username,
+            'author' => $author ? [
+                'uuid' => $author->uuid,
+                'username' => $author->username,
+            ] : [
+                'uuid' => null,
+                'username' => 'Deleted User',
             ],
             'file_count' => $revision->file_count,
             'is_preset' => $revision->is_preset,
             'preset_name' => $revision->preset_name,
-            'files' => $revision->files->pluck('file_path')->toArray(),
-            'created_at' => $revision->created_at->toAtomString(),
+            'files' => $revision->relationLoaded('files')
+                ? $revision->files->pluck('file_path')->toArray()
+                : [],
+            'created_at' => $revision->created_at?->toAtomString(),
         ];
     }
 }

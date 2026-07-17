@@ -35,9 +35,7 @@ class ConfigRevisionController extends ClientApiController
 
         $revisions = $this->revisionService->getRevisionHistory($server, $perPage, $presetsOnly);
 
-        return $this->fractal->collection($revisions)
-            ->transformWith($this->getTransformer(ConfigRevisionTransformer::class))
-            ->toArray();
+        return $this->fractal->paginatedCollection($revisions, ConfigRevisionTransformer::class);
     }
 
     public function show(Server $server, int $revision): JsonResponse
@@ -224,6 +222,8 @@ class ConfigRevisionController extends ClientApiController
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $revision->load(['author', 'files']);
+
         Activity::event('server:config-revision.create')
             ->property('message', $message)
             ->property('file_count', $revision->file_count)
@@ -260,6 +260,8 @@ class ConfigRevisionController extends ClientApiController
                 'error' => 'Failed to revert. Files may be unchanged or daemon unreachable.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        $newRevision->load(['author', 'files']);
 
         Activity::event('server:config-revision.revert')
             ->property('target_revision_hash', $revisionModel->hash)
@@ -310,9 +312,11 @@ class ConfigRevisionController extends ClientApiController
             ->property('revision_hash', $revisionModel->hash)
             ->log();
 
+        $freshRevision = $revisionModel->fresh()->load(['author', 'files']);
+
         return new JsonResponse([
             'object' => 'config_revision',
-            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($revisionModel->fresh()),
+            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($freshRevision),
         ]);
     }
 
@@ -330,6 +334,8 @@ class ConfigRevisionController extends ClientApiController
                 'error' => 'Failed to activate preset.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        $newRevision->load(['author', 'files']);
 
         Activity::event('server:config-revision.preset.activate')
             ->property('preset_name', $presetName)
@@ -361,10 +367,17 @@ class ConfigRevisionController extends ClientApiController
     {
         $presets = ServerConfigRevision::where('server_id', $server->id)
             ->where('is_preset', true)
+            ->with(['author', 'files'])
             ->orderByDesc('created_at')
             ->get();
 
-        return new JsonResponse(['data' => $presets]);
+        return new JsonResponse([
+            'object' => 'list',
+            'data' => $presets->map(fn ($revision) => [
+                'object' => 'config_revision',
+                'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($revision),
+            ])->all(),
+        ]);
     }
 
     public function getWatchPatterns(Server $server): JsonResponse

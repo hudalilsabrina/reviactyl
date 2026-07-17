@@ -5,6 +5,8 @@ namespace App\Services\ConfigRevisions;
 use App\Models\Server;
 use App\Models\ServerConfigWatchPattern;
 use App\Repositories\Agent\DaemonFileRepository;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WatchPatternService
 {
@@ -61,14 +63,16 @@ class WatchPatternService
      */
     public function updatePatterns(Server $server, array $patterns): void
     {
-        ServerConfigWatchPattern::where('server_id', $server->id)->delete();
+        DB::transaction(function () use ($server, $patterns) {
+            ServerConfigWatchPattern::where('server_id', $server->id)->delete();
 
-        foreach ($patterns as $pattern) {
-            ServerConfigWatchPattern::create([
-                'server_id' => $server->id,
-                'pattern' => $pattern,
-            ]);
-        }
+            foreach ($patterns as $pattern) {
+                ServerConfigWatchPattern::create([
+                    'server_id' => $server->id,
+                    'pattern' => $pattern,
+                ]);
+            }
+        });
     }
 
     /**
@@ -92,7 +96,13 @@ class WatchPatternService
 
         try {
             $contents = $this->fileRepository->setServer($server)->getDirectory($path);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::debug('ConfigRevisions: Failed to list directory', [
+                'server_id' => $server->id,
+                'path' => $path,
+                'error' => $e->getMessage(),
+            ]);
+
             return [];
         }
 
@@ -122,13 +132,13 @@ class WatchPatternService
      */
     private function matchGlob(string $pattern, string $value): bool
     {
-        // Convert glob to regex
+        // Convert glob to regex — replace ** before * to avoid partial consumption
         $regex = str_replace(
-            ['\*', '\*\*', '\?'],
-            ['[^/]*', '.*', '[^/]'],
+            ['\*\*', '\*', '\?'],
+            ['.*', '[^/]*', '[^/]'],
             preg_quote($pattern, '/')
         );
 
-        return (bool) preg_match('/^'.$regex.'$/i', $value);
+        return (bool) preg_match('/^'.$regex.'$/', $value);
     }
 }

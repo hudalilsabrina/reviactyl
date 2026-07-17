@@ -8,6 +8,7 @@ use App\Models\ServerConfigRevision;
 use App\Models\User;
 use App\Repositories\Agent\DaemonFileRepository;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class ConfigRevisionService
 {
@@ -53,7 +54,13 @@ class ConfigRevisionService
         foreach ($filePaths as $filePath) {
             try {
                 $content = $this->fileRepository->setServer($server)->getContent($filePath);
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                Log::debug('ConfigRevisions: Failed to fetch file content', [
+                    'server_id' => $server->id,
+                    'file' => $filePath,
+                    'error' => $e->getMessage(),
+                ]);
+
                 continue;
             }
 
@@ -154,11 +161,16 @@ class ConfigRevisionService
      */
     public function getFullSnapshot(ServerConfigRevision $revision): array
     {
-        // Collect all ancestor revision IDs (including this one)
+        // Collect all ancestor revision IDs (including this one) with circular-reference guard
         $ids = [];
+        $visited = [];
         $current = $revision;
 
         while ($current) {
+            if (isset($visited[$current->id])) {
+                break; // Circular reference detected, stop traversal
+            }
+            $visited[$current->id] = true;
             $ids[] = $current->id;
             $current = $current->parent_id ? ServerConfigRevision::find($current->parent_id) : null;
         }
@@ -226,7 +238,13 @@ class ConfigRevisionService
             try {
                 $this->fileRepository->setServer($revision->server)->putContent($filePath, $content);
                 $revertedPaths[] = $filePath;
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                Log::warning('ConfigRevisions: Failed to revert file', [
+                    'server_id' => $revision->server_id,
+                    'file' => $filePath,
+                    'error' => $e->getMessage(),
+                ]);
+
                 continue;
             }
         }
@@ -297,17 +315,78 @@ class ConfigRevisionService
             ->orderByDesc('id')
             ->pluck('id');
 
-        if ($revisions->count() <= $maxRevisions) {
+        // Prune by count
+        if ($revisions->count() > $maxRevisions) {
+            $toPrune = $revisions->slice($maxRevisions);
+
+            if ($toPrune->isNotEmpty()) {
+                $this->pruneRevisions($toPrune->toArray());
+            }
+        }
+
+        // Prune by storage limit
+        $this->enforceStorageLimit($server);
+    }
+
+    /**
+     * Enforce storage limit — prune oldest non-preset revisions if over limit.
+     */
+    private function enforceStorageLimit(Server $server): void
+    {
+        $maxStorage = config('panel.config_revisions.max_storage_per_server');
+        if (! $maxStorage) {
             return;
         }
 
-        $toPrune = $revisions->slice($maxRevisions);
-
-        if ($toPrune->isEmpty()) {
+        $storagePath = config('panel.config_revisions.storage_path');
+        if (! File::isDirectory($storagePath)) {
             return;
         }
 
-        $this->pruneRevisions($toPrune->toArray());
+        // Calculate total size of blobs referenced by this server
+        $serverHashes = ServerConfigFile::whereIn('revision_id', function ($query) use ($server) {
+            $query->select('id')
+                ->from('server_config_revisions')
+                ->where('server_id', $server->id);
+        })->pluck('content_hash')->unique();
+
+        $totalSize = 0;
+        foreach ($serverHashes as $hash) {
+            $blobPath = $storagePath.'/'.$hash;
+            if (File::exists($blobPath)) {
+                $totalSize += File::size($blobPath);
+            }
+        }
+
+        if ($totalSize <= $maxStorage) {
+            return;
+        }
+
+        // Prune oldest non-preset revisions until under limit
+        $oldestRevisions = ServerConfigRevision::where('server_id', $server->id)
+            ->where('is_preset', false)
+            ->orderBy('id')
+            ->pluck('id');
+
+        foreach ($oldestRevisions as $revisionId) {
+            if ($totalSize <= $maxStorage) {
+                break;
+            }
+
+            $fileHashes = ServerConfigFile::where('revision_id', $revisionId)
+                ->pluck('content_hash')
+                ->unique();
+
+            $this->pruneRevisions([$revisionId]);
+
+            // Estimate size freed (approximate)
+            foreach ($fileHashes as $hash) {
+                $blobPath = $storagePath.'/'.$hash;
+                if (File::exists($blobPath)) {
+                    $totalSize -= File::size($blobPath);
+                }
+            }
+        }
     }
 
     /**
