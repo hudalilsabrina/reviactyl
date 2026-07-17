@@ -9,6 +9,7 @@ export interface UserData {
     email: string;
     language: string;
     fileEditor: string;
+    panelBackground: string | null;
     rootAdmin: boolean;
     useTotp: boolean;
     createdAt: Date;

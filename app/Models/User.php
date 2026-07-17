@@ -153,6 +153,7 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
         'gravatar',
         'root_admin',
         'editor',
+        'panel_background',
         'last_seen',
     ];
 

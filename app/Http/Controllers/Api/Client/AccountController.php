@@ -112,4 +112,24 @@ class AccountController extends ClientApiController
 
         return new JsonResponse([$user], Response::HTTP_OK);
     }
+
+    public function updatePanelBackground(Request $request): JsonResponse
+    {
+        $request->validate([
+            'panelBackground' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $user = $request->user();
+        $original = $user->panel_background;
+        $user->panel_background = $request->input('panelBackground') ?: null;
+        $user->save();
+
+        if ($original !== $user->panel_background) {
+            Activity::event('user:account.panel-background-changed')
+                ->property(['old' => $original, 'new' => $user->panel_background])
+                ->log();
+        }
+
+        return new JsonResponse([], Response::HTTP_NO_CONTENT);
+    }
 }

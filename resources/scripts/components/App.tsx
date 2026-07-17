@@ -13,6 +13,7 @@ import { ServerContext } from '@/state/server';
 import '@/assets/tailwind.css';
 import Spinner from '@/reviactyl/elements/Spinner';
 import { ThemeLoader } from '@/reviactyl/ui/ThemeEngine';
+import { BackgroundLoader } from '@/reviactyl/ui/BackgroundLoader';
 import { Invert } from '@/reviactyl/ui/SmartInvert';
 import { LocaleLoader } from '@/reviactyl/ui/LanguageSwitcher';
 
@@ -34,6 +35,7 @@ interface ExtendedWindow extends Window {
         use_totp: boolean;
         language: string;
         editor: string;
+        panel_background: string | null;
         updated_at: string;
         created_at: string;
     };
@@ -55,6 +57,7 @@ function App() {
             useTotp: PanelUser.use_totp,
             createdAt: new Date(PanelUser.created_at),
             fileEditor: PanelUser.editor,
+            panelBackground: PanelUser.panel_background,
             updatedAt: new Date(PanelUser.updated_at),
         });
     }
@@ -72,6 +75,7 @@ function App() {
             <GlobalStylesheet />
             <StoreProvider store={store}>
                 <ThemeLoader />
+                <BackgroundLoader />
                 <LocaleLoader />
                 <ProgressBar />
                 <div css={tw`mx-auto w-auto`}>
