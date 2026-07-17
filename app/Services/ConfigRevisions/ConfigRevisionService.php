@@ -8,7 +8,6 @@ use App\Models\ServerConfigRevision;
 use App\Models\User;
 use App\Repositories\Agent\DaemonFileRepository;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
 
 class ConfigRevisionService
 {
@@ -48,8 +47,8 @@ class ConfigRevisionService
             ->orderByDesc('id')
             ->first();
 
-        $storedFiles = [];
         $newHashes = [];
+        $contentLengths = [];
 
         foreach ($filePaths as $filePath) {
             try {
@@ -73,26 +72,26 @@ class ConfigRevisionService
             }
 
             $newHashes[$filePath] = $contentHash;
+            $contentLengths[$filePath] = strlen($content);
         }
 
         if (empty($newHashes)) {
             return null;
         }
 
-        // Check for duplicate — if all hashes match previous revision, skip
+        // Check for duplicate — compare against full snapshot (not just delta)
         if ($previousRevision) {
-            $previousFiles = $previousRevision->files()->pluck('content_hash', 'file_path')->toArray();
+            $previousSnapshot = $this->getFullSnapshot($previousRevision);
             $isDuplicate = true;
 
             foreach ($newHashes as $path => $hash) {
-                if (! isset($previousFiles[$path]) || $previousFiles[$path] !== $hash) {
+                if (! isset($previousSnapshot[$path]) || $previousSnapshot[$path] !== $hash) {
                     $isDuplicate = false;
                     break;
                 }
             }
 
-            // Also check if previous had files not in current set
-            if ($isDuplicate && count($previousFiles) !== count($newHashes)) {
+            if ($isDuplicate && count($previousSnapshot) !== count($newHashes)) {
                 $isDuplicate = false;
             }
 
@@ -120,17 +119,17 @@ class ConfigRevisionService
         ]);
 
         // Only store files that changed from previous revision (delta storage)
+        $previousSnapshot = $previousRevision ? $this->getFullSnapshot($previousRevision) : [];
+
         foreach ($newHashes as $filePath => $contentHash) {
-            $previousHash = $previousRevision
-                ? $previousRevision->files()->where('file_path', $filePath)->value('content_hash')
-                : null;
+            $previousHash = $previousSnapshot[$filePath] ?? null;
 
             if ($previousHash !== $contentHash) {
                 ServerConfigFile::create([
                     'revision_id' => $revision->id,
                     'file_path' => $filePath,
                     'content_hash' => $contentHash,
-                    'content_length' => strlen(File::get($storagePath.'/'.$contentHash)),
+                    'content_length' => $contentLengths[$filePath] ?? 0,
                 ]);
             }
         }
@@ -155,15 +154,23 @@ class ConfigRevisionService
      */
     public function getFullSnapshot(ServerConfigRevision $revision): array
     {
-        $files = [];
+        // Collect all ancestor revision IDs (including this one)
+        $ids = [];
         $current = $revision;
 
         while ($current) {
-            foreach ($current->files as $file) {
-                $files[$file->file_path] ??= $file->content_hash;
-            }
-
+            $ids[] = $current->id;
             $current = $current->parent_id ? ServerConfigRevision::find($current->parent_id) : null;
+        }
+
+        // Load all files for these revisions in one query
+        $allFiles = ServerConfigFile::whereIn('revision_id', $ids)
+            ->orderByDesc('revision_id')
+            ->get();
+
+        $files = [];
+        foreach ($allFiles as $file) {
+            $files[$file->file_path] ??= $file->content_hash;
         }
 
         return $files;

@@ -46,7 +46,7 @@ class ConfigRevisionController extends ClientApiController
 
         return new JsonResponse([
             'object' => 'config_revision',
-            'attributes' => (new ConfigRevisionTransformer())->transform($revisionModel),
+            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($revisionModel),
         ]);
     }
 
@@ -232,7 +232,7 @@ class ConfigRevisionController extends ClientApiController
 
         return (new JsonResponse([
             'object' => 'config_revision',
-            'attributes' => (new ConfigRevisionTransformer())->transform($revision),
+            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($revision),
         ]))->setStatusCode(Response::HTTP_CREATED);
     }
 
@@ -268,7 +268,7 @@ class ConfigRevisionController extends ClientApiController
 
         return new JsonResponse([
             'object' => 'config_revision',
-            'attributes' => (new ConfigRevisionTransformer())->transform($newRevision),
+            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($newRevision),
         ]);
     }
 
@@ -280,6 +280,18 @@ class ConfigRevisionController extends ClientApiController
 
         $revisionModel = $server->configRevisions()->findOrFail($revision);
         $name = $request->input('name');
+
+        // Check preset name uniqueness
+        $nameTaken = ServerConfigRevision::where('server_id', $server->id)
+            ->where('is_preset', true)
+            ->where('preset_name', $name)
+            ->exists();
+
+        if ($nameTaken) {
+            return new JsonResponse([
+                'error' => "Preset name \"{$name}\" already exists.",
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         // Check preset limit
         $maxPresets = config('panel.config_revisions.max_presets_per_server', 20);
@@ -300,7 +312,7 @@ class ConfigRevisionController extends ClientApiController
 
         return new JsonResponse([
             'object' => 'config_revision',
-            'attributes' => (new ConfigRevisionTransformer())->transform($revisionModel->fresh()),
+            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($revisionModel->fresh()),
         ]);
     }
 
@@ -325,7 +337,7 @@ class ConfigRevisionController extends ClientApiController
 
         return new JsonResponse([
             'object' => 'config_revision',
-            'attributes' => (new ConfigRevisionTransformer())->transform($newRevision),
+            'attributes' => $this->getTransformer(ConfigRevisionTransformer::class)->transform($newRevision),
         ]);
     }
 
@@ -343,6 +355,16 @@ class ConfigRevisionController extends ClientApiController
             ->log();
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
+    }
+
+    public function listPresets(Server $server): JsonResponse
+    {
+        $presets = ServerConfigRevision::where('server_id', $server->id)
+            ->where('is_preset', true)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return new JsonResponse(['data' => $presets]);
     }
 
     public function getWatchPatterns(Server $server): JsonResponse

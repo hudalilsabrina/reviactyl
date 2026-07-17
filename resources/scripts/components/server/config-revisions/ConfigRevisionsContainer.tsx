@@ -66,9 +66,16 @@ const ConfigRevisionsContainer = () => {
     }, [uuid, page]);
 
     const handleCreateSnapshot = async (message?: string, files?: string[]) => {
-        await createSnapshot(uuid, message, files);
-        setShowCreateModal(false);
-        fetchRevisions();
+        clearFlashes('config-revisions');
+
+        try {
+            await createSnapshot(uuid, message, files);
+            setShowCreateModal(false);
+            fetchRevisions();
+        } catch (error) {
+            clearAndAddHttpError({ key: 'config-revisions', error: httpErrorToHuman(error) });
+            throw error;
+        }
     };
 
     const handleRevert = async (revision: ConfigRevision) => {

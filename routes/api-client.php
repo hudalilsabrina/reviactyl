@@ -8,7 +8,6 @@ use App\Http\Middleware\Api\Client\Server\AuthenticateServerAccess;
 use App\Http\Middleware\Api\Client\Server\ResourceBelongsToServer;
 use App\Http\Middleware\RequireTwoFactorAuthentication;
 use App\Models\Server;
-use App\Models\ServerConfigRevision;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -183,14 +182,7 @@ Route::group([
         Route::get('/watch-patterns', [Client\Servers\ConfigRevisionController::class, 'getWatchPatterns']);
         Route::put('/watch-patterns', [Client\Servers\ConfigRevisionController::class, 'updateWatchPatterns']);
         Route::post('/watch-patterns/reset', [Client\Servers\ConfigRevisionController::class, 'resetWatchPatterns']);
-        Route::get('/presets', function (Server $server) {
-            $revisions = ServerConfigRevision::where('server_id', $server->id)
-                ->where('is_preset', true)
-                ->orderByDesc('created_at')
-                ->get();
-
-            return response()->json(['data' => $revisions]);
-        });
+        Route::get('/presets', [Client\Servers\ConfigRevisionController::class, 'listPresets']);
         Route::post('/presets/{presetName}/activate', [Client\Servers\ConfigRevisionController::class, 'activatePreset']);
         Route::delete('/presets/{presetName}', [Client\Servers\ConfigRevisionController::class, 'deletePreset']);
         Route::get('/{revision}', [Client\Servers\ConfigRevisionController::class, 'show']);
