@@ -92,18 +92,22 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
     return (
         <Modal visible={visible} onDismissed={onDismissed} size='lg' appear>
             <FlashMessageRender byKey={'server:plugins'} className='mb-4' />
-            <div className='flex items-start gap-4'>
+            <div className='flex items-start gap-3 sm:gap-4'>
                 {plugin.icon ? (
-                    <img src={plugin.icon} alt='' className='w-16 h-16 rounded-ui object-cover flex-none' />
+                    <img
+                        src={plugin.icon}
+                        alt=''
+                        className='w-12 h-12 sm:w-16 sm:h-16 rounded-ui object-cover flex-none'
+                    />
                 ) : (
-                    <div className='w-16 h-16 rounded-ui bg-gray-800 flex items-center justify-center flex-none'>
-                        <FaPuzzlePiece className='w-6 h-6 text-gray-500' />
+                    <div className='w-12 h-12 sm:w-16 sm:h-16 rounded-ui bg-gray-800 flex items-center justify-center flex-none'>
+                        <FaPuzzlePiece className='w-5 h-5 sm:w-6 sm:h-6 text-gray-500' />
                     </div>
                 )}
-                <div className='min-w-0'>
-                    <h2 className='text-xl font-semibold text-gray-100 truncate'>{plugin.name}</h2>
-                    {details?.author && <p className='text-sm text-gray-400'>{details.author}</p>}
-                    <div className='flex items-center gap-4 mt-1 text-xs text-gray-500'>
+                <div className='min-w-0 flex-1'>
+                    <h2 className='text-lg sm:text-xl font-semibold text-gray-100 break-words'>{plugin.name}</h2>
+                    {details?.author && <p className='text-sm text-gray-400 truncate'>{details.author}</p>}
+                    <div className='flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-gray-500'>
                         {details?.downloads !== null && details?.downloads !== undefined && (
                             <span className='inline-flex items-center gap-1' title={details.downloads.toLocaleString()}>
                                 <FaDownload /> {formatCount(details.downloads)}
@@ -123,7 +127,7 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                 </div>
             </div>
 
-            <div className='mt-4 max-h-64 overflow-y-auto pr-1'>
+            <div className='mt-4 max-h-72 sm:max-h-80 overflow-y-auto pr-1'>
                 {!details ? (
                     <Spinner size='base' centered />
                 ) : bodyHtml ? (
@@ -159,7 +163,7 @@ export default ({ uuid, provider, plugin, visible, onDismissed, onInstalled }: P
                     onClick={install}
                     disabled={!selectedVersion || installing}
                     isLoading={installing}
-                    className='sm:w-auto w-full'
+                    className='sm:w-auto w-full flex-none'
                 >
                     {t('install')}
                 </Button>

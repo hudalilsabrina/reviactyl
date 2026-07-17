@@ -24,7 +24,7 @@ const PROVIDERS: { id: PluginProvider; label: string }[] = [
 const PluginCard = ({ plugin, onClick }: { plugin: PluginSearchResult; onClick: () => void }) => (
     <button
         onClick={onClick}
-        className='text-left rounded-ui bg-gray-900 border border-gray-800 p-4 flex gap-3 transition-colors duration-150 hover:border-primary-500/60 focus:outline-none focus:border-primary-500'
+        className='w-full text-left rounded-ui bg-gray-900 border border-gray-800 p-3 sm:p-4 flex gap-3 transition-colors duration-150 hover:border-primary-500/60 focus:outline-none focus:border-primary-500'
     >
         {plugin.icon ? (
             <img src={plugin.icon} alt='' className='w-12 h-12 rounded-ui object-cover flex-none' />
@@ -66,15 +66,20 @@ const PageBar = ({
 
     const buttonClass = (active: boolean) =>
         classNames(
-            'px-3 py-1.5 text-sm rounded-ui border transition-colors duration-150 inline-flex items-center',
+            'min-w-[2.25rem] min-h-[2.25rem] px-2.5 py-1.5 text-sm rounded-ui border transition-colors duration-150 inline-flex items-center justify-center',
             active
                 ? 'bg-primary-500/80 border-primary-600/80 text-primary-50'
                 : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed'
         );
 
     return (
-        <div className='flex flex-wrap justify-center items-center gap-1 mt-4'>
-            <button disabled={page === 1} onClick={() => onSelect(page - 1)} className={buttonClass(false)}>
+        <div className='flex flex-wrap justify-center items-center gap-1.5 mt-4'>
+            <button
+                disabled={page === 1}
+                onClick={() => onSelect(page - 1)}
+                className={buttonClass(false)}
+                aria-label='Previous page'
+            >
                 <FaAngleLeft />
             </button>
             {start > 1 && (
@@ -98,7 +103,12 @@ const PageBar = ({
                     </button>
                 </>
             )}
-            <button disabled={page >= totalPages} onClick={() => onSelect(page + 1)} className={buttonClass(false)}>
+            <button
+                disabled={page >= totalPages}
+                onClick={() => onSelect(page + 1)}
+                className={buttonClass(false)}
+                aria-label='Next page'
+            >
                 <FaAngleRight />
             </button>
         </div>
@@ -151,8 +161,8 @@ export default () => {
     return (
         <ServerContentBlock title={t('title')} showFlashKey={'server:plugins'}>
             <Card className='flex flex-col gap-3 mb-1 mt-2'>
-                <div className='flex flex-wrap items-center gap-2'>
-                    <div className='flex flex-wrap gap-1'>
+                <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                    <div className='grid grid-cols-2 sm:flex sm:flex-wrap gap-1'>
                         {PROVIDERS.map((p) => (
                             <button
                                 key={p.id}
@@ -161,7 +171,7 @@ export default () => {
                                     setPage(1);
                                 }}
                                 className={classNames(
-                                    'px-3 py-1.5 text-sm rounded-ui border transition-colors duration-150',
+                                    'px-3 py-2 sm:py-1.5 text-sm rounded-ui border transition-colors duration-150',
                                     provider === p.id
                                         ? 'bg-primary-500/80 border-primary-600/80 text-primary-50'
                                         : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500'
@@ -171,7 +181,7 @@ export default () => {
                             </button>
                         ))}
                     </div>
-                    <div className='relative flex-1 min-w-[200px]'>
+                    <div className='relative flex-1 w-full sm:min-w-[200px]'>
                         <FaSearch className='absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none' />
                         <Input
                             type='text'
