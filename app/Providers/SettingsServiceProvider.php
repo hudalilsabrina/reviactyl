@@ -41,6 +41,9 @@ class SettingsServiceProvider extends ServiceProvider
         'panel:auth:github_enabled',
         'panel:auth:github_client_id',
         'panel:auth:github_client_secret',
+        'panel:config_revisions:enabled',
+        'panel:config_revisions:auto_snapshot_on_write',
+        'panel:config_revisions:max_revisions_per_server',
     ];
 
     protected array $designifyKeys = [
