@@ -31,7 +31,7 @@ const RevisionRow = ({ revision, isSelected, onViewDiff, onRevert, onPromote }: 
                 <div css={tw`flex-1 min-w-0`}>
                     <div css={tw`flex items-center gap-2 mb-1`}>
                         <code css={tw`font-mono text-xs bg-gray-800 rounded px-1.5 py-0.5 text-gray-300`}>
-                            {revision.hash.substring(0, 8)}
+                            {revision.hash?.substring(0, 8) ?? '—'}
                         </code>
                         {revision.is_preset && (
                             <span css={tw`text-xs bg-primary-500/20 text-primary-300 rounded px-1.5 py-0.5`}>

@@ -27,7 +27,7 @@ const CompareSelector = ({ revisions, onCompare, onDismiss }: Props) => {
                     >
                         {revisions.map((r) => (
                             <option key={r.id} value={r.id}>
-                                {r.hash.substring(0, 8)} — {r.message}
+                                {r.hash?.substring(0, 8) ?? '—'} — {r.message}
                             </option>
                         ))}
                     </select>
@@ -42,7 +42,7 @@ const CompareSelector = ({ revisions, onCompare, onDismiss }: Props) => {
                         <option value={0}>Current (live files)</option>
                         {revisions.map((r) => (
                             <option key={r.id} value={r.id}>
-                                {r.hash.substring(0, 8)} — {r.message}
+                                {r.hash?.substring(0, 8) ?? '—'} — {r.message}
                             </option>
                         ))}
                     </select>

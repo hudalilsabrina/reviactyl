@@ -199,7 +199,7 @@ const ConfigRevisionsContainer = () => {
                 <Card css={tw`mb-4`}>
                     <div css={tw`flex items-center justify-between mb-3`}>
                         <h3 css={tw`text-sm font-semibold text-gray-200`}>
-                            Diff: {selectedRevision.hash.substring(0, 8)} vs{' '}
+                            Diff: {selectedRevision.hash?.substring(0, 8) ?? '—'} vs{' '}
                             {typeof diff.revision_to === 'string' ? diff.revision_to : `#${diff.revision_to}`}
                         </h3>
                         <button
