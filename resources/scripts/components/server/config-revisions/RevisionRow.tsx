@@ -48,7 +48,7 @@ const RevisionRow = ({ revision, isSelected, onViewDiff, onRevert, onPromote }: 
                     <div css={tw`flex items-center gap-2 text-xs text-gray-500`}>
                         <span>{revision.author?.username ?? 'Unknown'}</span>
                         <span>&middot;</span>
-                        <span>{new Date(revision.created_at).toLocaleString()}</span>
+                        <span>{revision.created_at ? new Date(revision.created_at).toLocaleString() : 'Unknown'}</span>
                     </div>
 
                     {revision.files && revision.files.length > 0 && (

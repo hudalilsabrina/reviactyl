@@ -19,7 +19,8 @@ const PresetManager = ({ presets, onActivate, onDelete }: Props) => {
                         <div>
                             <span css={tw`text-sm text-primary-300 font-medium`}>{preset.preset_name}</span>
                             <span css={tw`text-xs text-gray-500 ml-2`}>
-                                {preset.file_count} files &middot; {new Date(preset.created_at).toLocaleDateString()}
+                                {preset.file_count} files &middot;{' '}
+                                {preset.created_at ? new Date(preset.created_at).toLocaleDateString() : 'Unknown'}
                             </span>
                         </div>
                         <div css={tw`flex gap-2`}>

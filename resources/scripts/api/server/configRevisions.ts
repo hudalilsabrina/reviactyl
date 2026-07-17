@@ -41,15 +41,19 @@ export const getRevisions = async (uuid: string, page = 1, perPage = 25, presets
     const { data } = await http.get(`/api/client/servers/${uuid}/config-revisions`, {
         params: { page, per_page: perPage, preset_only: presetsOnly },
     });
-    return data;
+
+    return {
+        ...data,
+        data: (data.data ?? []).map((item: { object: string; attributes: ConfigRevision }) => item.attributes),
+    };
 };
 
 export const getRevisionDetail = async (
     uuid: string,
     revisionId: number
-): Promise<{ object: string; attributes: ConfigRevision }> => {
+): Promise<ConfigRevision> => {
     const { data } = await http.get(`/api/client/servers/${uuid}/config-revisions/${revisionId}`);
-    return data;
+    return data.attributes ?? data;
 };
 
 export const getRevisionFiles = async (uuid: string, revisionId: number) => {
@@ -80,27 +84,32 @@ export const diffAgainstCurrent = async (uuid: string, revisionId: number): Prom
     return data.attributes;
 };
 
-export const createSnapshot = async (uuid: string, message?: string, files?: string[]) => {
+export const createSnapshot = async (uuid: string, message?: string, files?: string[]): Promise<ConfigRevision> => {
     const { data } = await http.post(`/api/client/servers/${uuid}/config-revisions`, { message, files });
-    return data;
+    return data.attributes ?? data;
 };
 
-export const revertToRevision = async (uuid: string, revisionId: number, files?: string[], message?: string) => {
+export const revertToRevision = async (
+    uuid: string,
+    revisionId: number,
+    files?: string[],
+    message?: string
+): Promise<ConfigRevision> => {
     const { data } = await http.post(`/api/client/servers/${uuid}/config-revisions/${revisionId}/revert`, {
         files,
         message,
     });
-    return data;
+    return data.attributes ?? data;
 };
 
-export const promoteToPreset = async (uuid: string, revisionId: number, name: string) => {
+export const promoteToPreset = async (uuid: string, revisionId: number, name: string): Promise<ConfigRevision> => {
     const { data } = await http.post(`/api/client/servers/${uuid}/config-revisions/${revisionId}/promote`, { name });
-    return data;
+    return data.attributes ?? data;
 };
 
-export const activatePreset = async (uuid: string, presetName: string) => {
+export const activatePreset = async (uuid: string, presetName: string): Promise<ConfigRevision> => {
     const { data } = await http.post(`/api/client/servers/${uuid}/config-revisions/presets/${presetName}/activate`);
-    return data;
+    return data.attributes ?? data;
 };
 
 export const deletePreset = async (uuid: string, presetName: string) => {
@@ -112,12 +121,12 @@ export const getWatchPatterns = async (uuid: string): Promise<WatchPatternsRespo
     return data;
 };
 
-export const updateWatchPatterns = async (uuid: string, patterns: string[]) => {
+export const updateWatchPatterns = async (uuid: string, patterns: string[]): Promise<WatchPatternsResponse> => {
     const { data } = await http.put(`/api/client/servers/${uuid}/config-revisions/watch-patterns`, { patterns });
     return data;
 };
 
-export const resetWatchPatterns = async (uuid: string) => {
+export const resetWatchPatterns = async (uuid: string): Promise<WatchPatternsResponse> => {
     const { data } = await http.post(`/api/client/servers/${uuid}/config-revisions/watch-patterns/reset`);
     return data;
 };
