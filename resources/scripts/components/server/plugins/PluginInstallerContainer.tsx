@@ -11,7 +11,7 @@ import { ServerContext } from '@/state/server';
 import { PluginProvider, PluginSearchResult, searchPlugins } from '@/api/server/plugins';
 import PluginDetailsModal from '@/components/server/plugins/PluginDetailsModal';
 import { formatCount } from '@/components/server/plugins/format';
-import { FaDownload, FaPuzzlePiece, FaSearch } from 'react-icons/fa';
+import { FaAngleLeft, FaAngleRight, FaDownload, FaPuzzlePiece, FaSearch } from 'react-icons/fa';
 import classNames from 'classnames';
 
 const PROVIDERS: { id: PluginProvider; label: string }[] = [
@@ -49,6 +49,62 @@ const PluginCard = ({ plugin, onClick }: { plugin: PluginSearchResult; onClick: 
     </button>
 );
 
+const PageBar = ({
+    page,
+    total,
+    onSelect,
+}: {
+    page: number;
+    total: number | null;
+    onSelect: (page: number) => void;
+}) => {
+    if (total === null || total <= 20) return null;
+
+    const totalPages = Math.ceil(total / 20);
+    const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+    const pages = Array.from({ length: Math.min(5, totalPages - start + 1) }, (_, i) => start + i);
+
+    const buttonClass = (active: boolean) =>
+        classNames(
+            'px-3 py-1.5 text-sm rounded-ui border transition-colors duration-150 inline-flex items-center',
+            active
+                ? 'bg-primary-500/80 border-primary-600/80 text-primary-50'
+                : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed'
+        );
+
+    return (
+        <div className='flex flex-wrap justify-center items-center gap-1 mt-4'>
+            <button disabled={page === 1} onClick={() => onSelect(page - 1)} className={buttonClass(false)}>
+                <FaAngleLeft />
+            </button>
+            {start > 1 && (
+                <>
+                    <button onClick={() => onSelect(1)} className={buttonClass(false)}>
+                        1
+                    </button>
+                    {start > 2 && <span className='text-gray-600 px-1'>…</span>}
+                </>
+            )}
+            {pages.map((p) => (
+                <button key={p} onClick={() => onSelect(p)} className={buttonClass(p === page)}>
+                    {p}
+                </button>
+            ))}
+            {start + pages.length - 1 < totalPages && (
+                <>
+                    {start + pages.length < totalPages && <span className='text-gray-600 px-1'>…</span>}
+                    <button onClick={() => onSelect(totalPages)} className={buttonClass(false)}>
+                        {totalPages}
+                    </button>
+                </>
+            )}
+            <button disabled={page >= totalPages} onClick={() => onSelect(page + 1)} className={buttonClass(false)}>
+                <FaAngleRight />
+            </button>
+        </div>
+    );
+};
+
 export default () => {
     const { t } = useTranslation('server/plugins');
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
@@ -57,13 +113,18 @@ export default () => {
     const [provider, setProvider] = useState<PluginProvider>('modrinth');
     const [inputValue, setInputValue] = useState('');
     const [query, setQuery] = useState('');
+    const [page, setPage] = useState(1);
     const [results, setResults] = useState<PluginSearchResult[] | null>(null);
+    const [total, setTotal] = useState<number | null>(null);
     const [minecraftVersion, setMinecraftVersion] = useState<string | null>(null);
     const [selected, setSelected] = useState<PluginSearchResult | null>(null);
     const searchGenRef = useRef(0);
 
     useEffect(() => {
-        const timer = setTimeout(() => setQuery(inputValue.trim()), 350);
+        const timer = setTimeout(() => {
+            setQuery(inputValue.trim());
+            setPage(1);
+        }, 350);
         return () => clearTimeout(timer);
     }, [inputValue]);
 
@@ -72,18 +133,20 @@ export default () => {
         setResults(null);
 
         const gen = ++searchGenRef.current;
-        searchPlugins(uuid, provider, query)
-            .then(({ results, minecraftVersion }) => {
+        searchPlugins(uuid, provider, query, page)
+            .then(({ results, minecraftVersion, total }) => {
                 if (gen !== searchGenRef.current) return;
                 setResults(results);
                 setMinecraftVersion(minecraftVersion);
+                // Spiget does not report totals; estimate from the current page's fullness.
+                setTotal(total ?? (results.length >= 20 ? page * 20 + 1 : (page - 1) * 20 + results.length));
             })
             .catch((error) => {
                 if (gen !== searchGenRef.current) return;
                 setResults([]);
                 clearAndAddHttpError({ key: 'server:plugins', error });
             });
-    }, [provider, query]);
+    }, [provider, query, page]);
 
     return (
         <ServerContentBlock title={t('title')} showFlashKey={'server:plugins'}>
@@ -93,7 +156,10 @@ export default () => {
                         {PROVIDERS.map((p) => (
                             <button
                                 key={p.id}
-                                onClick={() => setProvider(p.id)}
+                                onClick={() => {
+                                    setProvider(p.id);
+                                    setPage(1);
+                                }}
                                 className={classNames(
                                     'px-3 py-1.5 text-sm rounded-ui border transition-colors duration-150',
                                     provider === p.id
@@ -131,19 +197,22 @@ export default () => {
                     </div>
                 </Card>
             ) : (
-                <motion.div
-                    key={provider}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.15, ease: 'easeIn' }}
-                    className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3'
-                >
-                    {results.map((plugin) => (
-                        <Can action={'file.create'} key={`${provider}:${plugin.id}`}>
-                            <PluginCard plugin={plugin} onClick={() => setSelected(plugin)} />
-                        </Can>
-                    ))}
-                </motion.div>
+                <>
+                    <motion.div
+                        key={provider}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.15, ease: 'easeIn' }}
+                        className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3'
+                    >
+                        {results.map((plugin) => (
+                            <Can action={'file.create'} key={`${provider}:${plugin.id}`}>
+                                <PluginCard plugin={plugin} onClick={() => setSelected(plugin)} />
+                            </Can>
+                        ))}
+                    </motion.div>
+                    <PageBar page={page} total={total} onSelect={setPage} />
+                </>
             )}
 
             {selected && (

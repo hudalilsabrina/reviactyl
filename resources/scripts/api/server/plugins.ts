@@ -30,13 +30,18 @@ export interface PluginVersion {
 export const searchPlugins = async (
     uuid: string,
     provider: PluginProvider,
-    query: string
-): Promise<{ results: PluginSearchResult[]; minecraftVersion: string | null }> => {
+    query: string,
+    page = 1
+): Promise<{ results: PluginSearchResult[]; minecraftVersion: string | null; total: number | null }> => {
     const { data } = await http.get(`/api/client/servers/${uuid}/plugins/search`, {
-        params: { provider, query },
+        params: { provider, query, page },
     });
 
-    return { results: data.data, minecraftVersion: data.meta?.minecraft_version ?? null };
+    return {
+        results: data.data,
+        minecraftVersion: data.meta?.minecraft_version ?? null,
+        total: data.meta?.total ?? null,
+    };
 };
 
 export const getPluginDetails = async (

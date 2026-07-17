@@ -24,18 +24,19 @@ class PluginProviderService
     }
 
     /**
-     * Search a provider for plugins. Returns a normalized list of projects.
+     * Search a provider for plugins. Returns a normalized list of projects plus
+     * pagination metadata (total is null when the provider does not report it).
      *
-     * @return array<int, array{id: string|int, slug: string|null, name: string, author: string|null, description: string|null, downloads: int|null, icon: string|null}>
+     * @return array{results: array<int, array{id: string|int, slug: string|null, name: string, author: string|null, description: string|null, downloads: int|null, icon: string|null}>, total: int|null}
      */
     public function search(string $provider, string $query, Server $server, int $offset = 0): array
     {
         return match ($provider) {
-            'modrinth' => $this->searchModrinth($query, $server),
+            'modrinth' => $this->searchModrinth($query, $server, $offset),
             'spiget' => $this->searchSpiget($query, $offset),
             'curseforge' => $this->searchCurseForge($query, $server, $offset),
             'hangar' => $this->searchHangar($query, $server, $offset),
-            default => [],
+            default => ['results' => [], 'total' => null],
         };
     }
 
@@ -106,23 +107,23 @@ class PluginProviderService
     // Modrinth (docs.modrinth.com) — only "plugin" projects are exposed.
     // ---------------------------------------------------------------------
 
-    private function searchModrinth(string $query, Server $server): array
+    private function searchModrinth(string $query, Server $server, int $offset): array
     {
         $facets = [['project_type:plugin']];
         if ($mc = $this->minecraftVersion($server)) {
             $facets[] = ['versions:'.$mc];
         }
 
-        $data = Http::acceptJson()
+        $response = Http::acceptJson()
             ->get('https://api.modrinth.com/v2/search', [
                 'query' => $query,
                 'limit' => 20,
+                'offset' => $offset,
                 'facets' => json_encode($facets),
             ])
-            ->throw()
-            ->json('hits') ?? [];
+            ->throw();
 
-        return array_map(fn ($hit) => [
+        $results = array_map(fn ($hit) => [
             'id' => $hit['project_id'] ?? $hit['slug'],
             'slug' => $hit['slug'] ?? null,
             'name' => $hit['title'] ?? '',
@@ -130,7 +131,9 @@ class PluginProviderService
             'description' => $hit['description'] ?? null,
             'downloads' => $hit['downloads'] ?? null,
             'icon' => $hit['icon_url'] ?? null,
-        ], $data);
+        ], $response->json('hits') ?? []);
+
+        return ['results' => $results, 'total' => $response->json('total_hits')];
     }
 
     private function detailsModrinth(string $id): ?array
@@ -218,15 +221,18 @@ class PluginProviderService
             ->throw()
             ->json() ?? [];
 
-        return array_map(fn ($r) => [
-            'id' => $r['id'],
-            'slug' => null,
-            'name' => $r['name'] ?? '',
-            'author' => null, // Search only returns the author ID; the name is loaded in the details view.
-            'description' => $r['tag'] ?? null,
-            'downloads' => $r['downloads'] ?? null,
-            'icon' => isset($r['icon']['url']) ? 'https://www.spigotmc.org/'.$r['icon']['url'] : null,
-        ], $data);
+        return [
+            'results' => array_map(fn ($r) => [
+                'id' => $r['id'],
+                'slug' => null,
+                'name' => $r['name'] ?? '',
+                'author' => null, // Search only returns the author ID; the name is loaded in the details view.
+                'description' => $r['tag'] ?? null,
+                'downloads' => $r['downloads'] ?? null,
+                'icon' => isset($r['icon']['url']) ? 'https://www.spigotmc.org/'.$r['icon']['url'] : null,
+            ], $data),
+            'total' => null, // Spiget search does not report a total count.
+        ];
     }
 
     private function detailsSpiget(string $id): ?array
@@ -330,12 +336,11 @@ class PluginProviderService
             $params['gameVersion'] = $mc;
         }
 
-        $data = $this->curseforge()
+        $response = $this->curseforge()
             ->get('https://api.curseforge.com/v1/mods/search', $params)
-            ->throw()
-            ->json('data') ?? [];
+            ->throw();
 
-        return array_map(fn ($m) => [
+        $results = array_map(fn ($m) => [
             'id' => $m['id'],
             'slug' => $m['slug'] ?? null,
             'name' => $m['name'] ?? '',
@@ -343,7 +348,9 @@ class PluginProviderService
             'description' => $m['summary'] ?? null,
             'downloads' => isset($m['downloadCount']) ? (int) $m['downloadCount'] : null,
             'icon' => Arr::get($m, 'logo.thumbnailUrl'),
-        ], $data);
+        ], $response->json('data') ?? []);
+
+        return ['results' => $results, 'total' => $response->json('pagination.totalCount')];
     }
 
     private function detailsCurseForge(string $id): ?array
@@ -438,16 +445,15 @@ class PluginProviderService
 
     private function searchHangar(string $query, Server $server, int $offset): array
     {
-        $data = Http::acceptJson()
+        $response = Http::acceptJson()
             ->get('https://hangar.papermc.io/api/v1/projects', [
                 'query' => $query,
                 'limit' => 20,
                 'offset' => $offset,
             ])
-            ->throw()
-            ->json('result') ?? [];
+            ->throw();
 
-        return array_map(fn ($p) => [
+        $results = array_map(fn ($p) => [
             'id' => $p['namespace']['slug'] ?? $p['name'],
             'slug' => $p['namespace']['slug'] ?? null,
             'name' => $p['name'] ?? '',
@@ -455,7 +461,9 @@ class PluginProviderService
             'description' => $p['description'] ?? null,
             'downloads' => Arr::get($p, 'stats.downloads'),
             'icon' => $p['avatarUrl'] ?? null,
-        ], $data);
+        ], $response->json('result') ?? []);
+
+        return ['results' => $results, 'total' => $response->json('pagination.count')];
     }
 
     private function detailsHangar(string $id): ?array

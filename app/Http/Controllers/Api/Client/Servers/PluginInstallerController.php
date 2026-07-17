@@ -34,20 +34,24 @@ class PluginInstallerController extends ClientApiController
         $request->validate([
             'provider' => ['required', Rule::in(PluginProviderService::PROVIDERS)],
             'query' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1|max:10000',
         ]);
 
         $provider = $request->input('provider');
         $this->ensureAvailable($provider);
 
+        $search = $this->providers->search(
+            $provider,
+            trim((string) $request->input('query', '')),
+            $server,
+            ((int) $request->input('page', 1) - 1) * 20
+        );
+
         return new JsonResponse([
-            'data' => $this->providers->search(
-                $provider,
-                trim((string) $request->input('query', '')),
-                $server,
-                (int) $request->input('page', 0)
-            ),
+            'data' => $search['results'],
             'meta' => [
                 'minecraft_version' => $this->providers->minecraftVersion($server),
+                'total' => $search['total'],
             ],
         ]);
     }
