@@ -42,7 +42,7 @@ class EggStartupPart extends Model
         'egg_id' => 'required|integer|exists:eggs,id',
         'name' => 'required|string|max:191',
         'value' => 'required|string|max:191',
-        'description' => 'nullable|string|max:500',
+        'description' => 'nullable|string|max:255',
         'default_enabled' => 'sometimes|boolean',
         'required' => 'sometimes|boolean',
         'sort_order' => 'sometimes|integer|min:0',

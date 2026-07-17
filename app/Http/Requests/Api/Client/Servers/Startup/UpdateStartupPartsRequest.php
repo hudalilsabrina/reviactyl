@@ -15,7 +15,7 @@ class UpdateStartupPartsRequest extends ClientApiRequest
     public function rules(): array
     {
         return [
-            'parts' => 'required|array',
+            'parts' => 'required|array|max:50',
             'parts.*.part_id' => 'required|integer',
             'parts.*.enabled' => 'required|boolean',
         ];
