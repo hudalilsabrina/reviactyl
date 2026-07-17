@@ -28,6 +28,7 @@ class AccountTransformer extends BaseClientTransformer
             'last_name' => $model->name_last,
             'language' => $model->language,
             'file_editor' => $model->editor,
+            'panel_background' => $model->panel_background,
         ];
     }
 }

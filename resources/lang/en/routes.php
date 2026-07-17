@@ -24,6 +24,7 @@ return [
         'databases' => 'Databases',
         'schedules' => 'Schedules',
         'backups' => 'Backups',
+        'config-revisions' => 'Config Revisions',
         'users' => 'Users',
         'settings' => 'Settings',
         'activity' => 'Activity',

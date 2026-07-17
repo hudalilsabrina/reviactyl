@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Models;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -16,11 +18,24 @@ use Laravel\Sanctum\Sanctum;
 class AppServiceProvider extends ServiceProvider
 {
     /**
+     * Destructive artisan commands blocked in production.
+     */
+    private const array PRODUCTION_BLOCKED_COMMANDS = [
+        'migrate:fresh',
+        'migrate:reset',
+        'migrate:rollback',
+        'db:wipe',
+        'schema:dump',
+    ];
+
+    /**
      * Bootstrap any application services.
      */
     public function boot(): void
     {
         Schema::defaultStringLength(191);
+
+        $this->blockDestructiveCommandsInProduction();
 
         Sanctum::usePersonalAccessTokenModel(Models\ApiKey::class);
 
@@ -62,6 +77,38 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->register(SettingsServiceProvider::class);
+    }
+
+    /**
+     * Block destructive artisan commands when APP_ENV is production.
+     */
+    private function blockDestructiveCommandsInProduction(): void
+    {
+        if (config('app.env') !== 'production') {
+            return;
+        }
+
+        Event::listen(function (CommandStarting $event) {
+            if (in_array($event->command, self::PRODUCTION_BLOCKED_COMMANDS, true)) {
+                $this->commandError(
+                    "Blocked: [{$event->command}] cannot run in production (APP_ENV=production). "
+                    .'Set APP_ENV=testing or use a non-production environment.'
+                );
+                exit(1);
+            }
+        });
+    }
+
+    /**
+     * Output an error message to the console.
+     */
+    private function commandError(string $message): void
+    {
+        if (defined('STDERR')) {
+            fwrite(STDERR, "\033[31m[SAFETY]\033[0m {$message}\n");
+        } else {
+            echo "[SAFETY] {$message}\n";
+        }
     }
 
     /**

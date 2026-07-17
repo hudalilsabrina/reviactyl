@@ -6,10 +6,117 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
-  backend:
-    name: Backend (PHP ${{ matrix.php }})
+  # ──────────────────────────────────────────────
+  # Fast checks — run first, fail fast
+  # ──────────────────────────────────────────────
+  lint-backend:
+    name: "Backend: Lint"
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: |
+            vendor
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-lint-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-lint-
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Pint (formatting check)
+        run: ./vendor/bin/pint --test -v
+
+  lint-frontend:
+    name: "Frontend: Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@11
+
+      - name: Cache pnpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-lint-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-lint-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: pnpm run lint
+
+      - name: TypeScript
+        run: pnpm run tsc
+
+  # ──────────────────────────────────────────────
+  # Static analysis
+  # ──────────────────────────────────────────────
+  static-analysis:
+    name: "Backend: PHPStan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Prepare Environment
+        run: |
+          cp .env.ci .env
+          mkdir -p storage/framework/{sessions,views,cache,testing}
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: |
+            vendor
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-stan-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-stan-
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: PHPStan
+        run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+  # ──────────────────────────────────────────────
+  # Tests
+  # ──────────────────────────────────────────────
+  test-backend:
+    name: "Backend: Tests (PHP ${{ matrix.php }})"
+    runs-on: ubuntu-latest
+    needs: [lint-backend]
     strategy:
       fail-fast: false
       matrix:
@@ -27,44 +134,33 @@ jobs:
 
       - name: Prepare Environment
         run: |
-          cp .env.example .env
-          sed -i 's|^#DB_DATABASE=panel|DB_DATABASE=${{ github.workspace }}/database/database.sqlite|' .env
-          sed -i 's|QUEUE_CONNECTION=redis|QUEUE_CONNECTION=sync|' .env
-          touch database/database.sqlite
+          cp .env.ci .env
           mkdir -p storage/framework/{sessions,views,cache,testing}
           mkdir -p storage/logs
           mkdir -p bootstrap/cache
 
-      - name: Get Composer Cache Directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache Composer Dependencies
+      - name: Cache Composer
         uses: actions/cache@v4
         with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-composer-${{ matrix.php }}-
+          path: |
+            vendor
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-${{ matrix.php }}-
 
-      - name: Install Composer Dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+      - name: Install Dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Post-Install Setup
-        run: |
-          composer run-script post-autoload-dump || true
-          php artisan key:generate
-          php artisan migrate --force
+      - name: Generate App Key
+        run: php artisan key:generate
 
-      - name: Check PHP Formatting (Pint)
-        run: ./vendor/bin/pint --test -v
+      - name: Pest Tests
+        run: php artisan test --parallel
 
-      - name: Static Analysis (PHPStan)
-        run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=512M
-
-  frontend:
-    name: Frontend
+  test-frontend:
+    name: "Frontend: Tests"
     runs-on: ubuntu-latest
+    needs: [lint-frontend]
 
     steps:
       - uses: actions/checkout@v4
@@ -77,26 +173,119 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm@11
 
-      - name: Get pnpm Store Directory
-        id: pnpm-cache
-        run: echo "dir=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Cache pnpm Dependencies
+      - name: Cache pnpm
         uses: actions/cache@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.dir }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
+          path: |
+            node_modules
+            ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-test-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-test-
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint (ESLint)
-        run: pnpm run lint
+      - name: Vitest
+        run: pnpm test
 
-      - name: Type Check (TSC)
-        run: pnpm run tsc
+  # ──────────────────────────────────────────────
+  # Build + Security
+  # ──────────────────────────────────────────────
+  build:
+    name: "Frontend: Build"
+    runs-on: ubuntu-latest
+    needs: [lint-frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@11
+
+      - name: Cache pnpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-build-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-build-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: public/build/
+          retention-days: 7
+
+  security:
+    name: "Security Audit"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@11
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: |
+            vendor
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-security-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-security-
+
+      - name: Install Composer Dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Composer Audit
+        run: composer audit --no-dev || true
+
+      - name: pnpm Audit
+        run: pnpm audit --prod || true
+
+  # ──────────────────────────────────────────────
+  # Final gate — branch protection target
+  # ──────────────────────────────────────────────
+  ci-status:
+    name: CI Status
+    if: always()
+    needs: [lint-backend, lint-frontend, static-analysis, test-backend, test-frontend, build, security]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.lint-backend.result }}" == "failure" || \
+                "${{ needs.lint-frontend.result }}" == "failure" || \
+                "${{ needs.static-analysis.result }}" == "failure" || \
+                "${{ needs.test-backend.result }}" == "failure" || \
+                "${{ needs.test-frontend.result }}" == "failure" || \
+                "${{ needs.build.result }}" == "failure" ]]; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
+          echo "All checks passed."

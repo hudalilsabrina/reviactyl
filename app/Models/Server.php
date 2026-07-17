@@ -463,6 +463,14 @@ class Server extends Model implements Identifiable
     }
 
     /**
+     * @return HasMany<ServerConfigRevision, $this>
+     */
+    public function configRevisions(): HasMany
+    {
+        return $this->hasMany(ServerConfigRevision::class);
+    }
+
+    /**
      * Returns all mounts that have this server has mounted.
      *
      * @return HasManyThrough<Mount, MountServer, $this>

@@ -194,4 +194,23 @@ return [
     'features' => [
         'new_server_identifiers' => (bool) env('PANEL_USE_SERVER_IDENTIFIERS', false),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Config Revisions
+    |--------------------------------------------------------------------------
+    |
+    | Settings for the config revision tracking system. When enabled, file
+    | changes through the panel editor are automatically versioned.
+    */
+
+    'config_revisions' => [
+        'enabled' => (bool) env('PANEL_CONFIG_REVISIONS_ENABLED', true),
+        'max_revisions_per_server' => (int) env('PANEL_MAX_CONFIG_REVISIONS', 200),
+        'max_presets_per_server' => (int) env('PANEL_MAX_CONFIG_PRESETS', 20),
+        'max_storage_per_server' => (int) env('PANEL_CONFIG_REVISIONS_MAX_STORAGE', 100 * 1024 * 1024),
+        'auto_snapshot_on_write' => (bool) env('PANEL_AUTO_SNAPSHOT_ON_WRITE', true),
+        'max_file_size' => (int) env('PANEL_CONFIG_REVISION_MAX_FILE_SIZE', 1024 * 1024),
+        'storage_path' => env('PANEL_CONFIG_REVISIONS_PATH', storage_path('app/config-revisions/blobs')),
+    ],
 ];

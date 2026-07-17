@@ -49,6 +49,7 @@
         "md5": "^2.3.0",
         "monaco-editor": "^0.55.1",
         "pathe": "^2.0.3",
+        "plyr": "^3.8.4",
         "plyr-react": "^6.0.0",
         "qrcode.react": "^1.0.1",
         "react": "19",

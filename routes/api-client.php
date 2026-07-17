@@ -7,6 +7,7 @@ use App\Http\Middleware\Activity\ServerSubject;
 use App\Http\Middleware\Api\Client\Server\AuthenticateServerAccess;
 use App\Http\Middleware\Api\Client\Server\ResourceBelongsToServer;
 use App\Http\Middleware\RequireTwoFactorAuthentication;
+use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -34,6 +35,7 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function () 
     Route::put('/password', [Client\AccountController::class, 'updatePassword'])->name('api:client.account.update-password');
     Route::put('/language', [Client\AccountController::class, 'updateLanguage'])->name('api:client.account.update-language');
     Route::put('/file-editor', [Client\AccountController::class, 'updateEditor'])->name('api:client.account.update-editor');
+    Route::put('/panel-background', [Client\AccountController::class, 'updatePanelBackground'])->name('api:client.account.update-panel-background');
 
     Route::get('/activity', Client\ActivityLogController::class)->name('api:client.account.activity');
 
@@ -173,5 +175,23 @@ Route::group([
         Route::post('/', [Client\Servers\SubdomainController::class, 'store']);
         Route::put('/{subdomain}', [Client\Servers\SubdomainController::class, 'update']);
         Route::delete('/{subdomain}', [Client\Servers\SubdomainController::class, 'delete']);
+    });
+
+    Route::group(['prefix' => '/config-revisions'], function () {
+        Route::get('/', [Client\Servers\ConfigRevisionController::class, 'index']);
+        Route::post('/', [Client\Servers\ConfigRevisionController::class, 'store']);
+        Route::get('/watch-patterns', [Client\Servers\ConfigRevisionController::class, 'getWatchPatterns']);
+        Route::put('/watch-patterns', [Client\Servers\ConfigRevisionController::class, 'updateWatchPatterns']);
+        Route::post('/watch-patterns/reset', [Client\Servers\ConfigRevisionController::class, 'resetWatchPatterns']);
+        Route::get('/presets', [Client\Servers\ConfigRevisionController::class, 'listPresets']);
+        Route::post('/presets/{presetName}/activate', [Client\Servers\ConfigRevisionController::class, 'activatePreset']);
+        Route::delete('/presets/{presetName}', [Client\Servers\ConfigRevisionController::class, 'deletePreset']);
+        Route::get('/{revision}', [Client\Servers\ConfigRevisionController::class, 'show']);
+        Route::get('/{revision}/files', [Client\Servers\ConfigRevisionController::class, 'files']);
+        Route::get('/{revision}/file', [Client\Servers\ConfigRevisionController::class, 'fileContent']);
+        Route::get('/{revision}/diff/{revisionB}', [Client\Servers\ConfigRevisionController::class, 'diff']);
+        Route::get('/{revision}/diff-current', [Client\Servers\ConfigRevisionController::class, 'diffCurrent']);
+        Route::post('/{revision}/revert', [Client\Servers\ConfigRevisionController::class, 'revert']);
+        Route::post('/{revision}/promote', [Client\Servers\ConfigRevisionController::class, 'promote']);
     });
 });
